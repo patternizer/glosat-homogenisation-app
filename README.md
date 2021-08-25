@@ -4,7 +4,7 @@
 
 Plotly python reactive dash app for inspecting GloSAT.p03 observations homogenised using [local expectation calculations with hold-out kriging](https://github.com/patternizer/glosat-homogenisation.git) developed by Professor Kevin Cowtan. Part of ongoing work for the [GloSAT Project](https://www.glosat.org):
 
-[Plotly Python Reactive Dash app](https://glosat-homogenisation.herokuapp.com/) for inspecting GloSAT.p03 station local expectation calculations. 
+[Plotly Python Reactive Dash app](https://glosat-homogenisation-app.herokuapp.com/) for inspecting GloSAT.p03 station local expectation calculations. 
 
 ## Contents
 
