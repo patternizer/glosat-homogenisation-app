@@ -152,11 +152,25 @@ layout = html.Div([
             ]), 
             width={'size':6}, 
             ),                        
-            dbc.Col(html.Div([
-                dcc.Graph(id="plot-worldmap", style = {'padding' : '10px', 'width': '100%', 'display': 'inline-block'}),                                    
-            ]), 
+
+#            dbc.Col(html.Div([
+#                dcc.Graph(id="plot-worldmap", style = {'padding' : '10px', 'width': '100%', #'display': 'inline-block'}),                                    
+#            ]), 
+#            width={'size':6}, 
+#            ),           
+
+            dbc.Col(html.Div([     
+                html.Br(),
+                html.Label(['Status: Experimental']),
+                html.Br(),
+                html.Label(['Dataset: GloSAT.p03']),
+                html.Br(),
+                html.Label(['Codebase: ', html.A('Github', href='https://github.com/patternizer/glosat-homogenisation')]),                
+            ],
+            style = {'padding' : '10px', 'width': '100%', 'display': 'inline-block'}),    
             width={'size':6}, 
-            ),           
+            ),
+
         ]),
 
         dbc.Row([
@@ -172,19 +186,19 @@ layout = html.Div([
             ),           
         ]),
         
-        dbc.Row([
-            dbc.Col(html.Div([     
-                html.Br(),
-                html.Label(['Status: Experimental']),
-                html.Br(),
-                html.Label(['Dataset: GloSAT.p03']),
-                html.Br(),
-                html.Label(['Codebase: ', html.A('Github', href='https://github.com/patternizer/glosat-homogenisation')]),                
-            ],
-            style = {'padding' : '10px', 'width': '100%', 'display': 'inline-block'}),    
-            width={'size':6}, 
-            ),
-        ]),
+#        dbc.Row([
+#            dbc.Col(html.Div([     
+#                html.Br(),
+#                html.Label(['Status: Experimental']),
+#                html.Br(),
+#                html.Label(['Dataset: GloSAT.p03']),
+#                html.Br(),
+#                html.Label(['Codebase: ', html.A('Github', href='https://github.com/patternizer/glosat-homogenisation')]),                
+#            ],
+#            style = {'padding' : '10px', 'width': '100%', 'display': 'inline-block'}),    
+#            width={'size':6}, 
+#            ),
+#        ]),
             
     ]),
 ])
