@@ -279,9 +279,9 @@ def update_plot_worldmap(value):
         title = {'text': 'STATIONS WITHIN 900 KM', 'x':0.1, 'y':0.95},        
     )
 #    fig.update_layout(mapbox_style="carto-positron", mapbox_center_lat=df['stationlat'].iloc[0], mapbox_center_lon=df['stationlon'].iloc[0]) 
-#    fig.update_layout(mapbox_style="carto-positron", mapbox_center_lat=lat[0], mapbox_center_lon=lon[0]) 
+    fig.update_layout(mapbox_style="carto-positron", mapbox_center_lat=lat[0], mapbox_center_lon=lon[0]) 
 #    fig.update_layout(mapbox_style="stamen-watercolor", mapbox_center_lat=lat[0], mapbox_center_lon=lon[0]) 
-    fig.update_layout(mapbox_style="open-street-map", mapbox_center_lat=lat[0], mapbox_center_lon=lon[0]) 
+#    fig.update_layout(mapbox_style="open-street-map", mapbox_center_lat=lat[0], mapbox_center_lon=lon[0]) 
 #    fig.update_layout(mapbox_style="stamen-terrain", mapbox_center_lat=lat[0], mapbox_center_lon=lon[0])     
     fig.update_layout(height=400, width=550, margin={"r":10,"t":50,"l":10,"b":40})    
     
