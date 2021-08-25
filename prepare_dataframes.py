@@ -26,7 +26,7 @@ reduce_precision = True
 # LOAD: LEK output dataframe: df_temp_expect
 #------------------------------------------------------------------------------
 
-df_temp = pd.read_pickle('df_temp_expect.pkl', compression='bz2')
+df_temp = pd.read_pickle('DATA/df_temp_expect.pkl', compression='bz2')
 
 if reduce_precision == True:
 
@@ -51,6 +51,8 @@ if reduce_precision == True:
 #    del df_temp['stationlastyear']
 #    del df_temp['stationfirstreliable']
 #    del df_temp['stationsource']
+    df_temp2 = df_temp.copy().dropna()
+    df_temp = df_temp2.copy()
     df_temp.to_pickle( "df_temp_expect_reduced.pkl", compression="bz2" )
 
 #------------------------------------------------------------------------------
@@ -74,7 +76,7 @@ for i in range(1,13):
     
     df_ex[str(i)] = df_temp['e'+str(i)]
 
-df_ex = df_ex.iloc[:,0:14]
+df_ex = df_ex.iloc[:,0:19]
 df_ex.to_pickle( "df_ex.pkl", compression="bz2" )
 
 #------------------------------------------------------------------------------
@@ -86,8 +88,12 @@ for i in range(1,13):
     
     df_sd[str(i)] = df_temp['s'+str(i)]
 
-df_sd = df_sd.iloc[:,0:14]
+df_sd = df_sd.iloc[:,0:19]
 df_sd.to_pickle( "df_sd.pkl", compression="bz2" )
 
 #------------------------------------------------------------------------------
 print('** END')
+
+import matplotlib.pyplot as plt
+plt.plot(df_anom['1'])
+plt.plot(df_ex['1'])
