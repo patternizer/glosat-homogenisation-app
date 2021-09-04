@@ -759,28 +759,7 @@ def update_plot_adjustments(value):
     if mask.sum() > 0:
 
         data = []
-        
-        trace_error = [
-            go.Scatter(x=t_monthly[mask], y=ex_monthly[mask]+sd_monthly[mask], 
-                       mode='lines', 
-                       fill='none',
-                       connectgaps=True,
-                       line=dict(width=1.0, color='rgba(242,242,242,0.2)'),             # grey                  
-                       name='uncertainty',      
-                       showlegend=False,
-#                      hovertemplate='%{y:.2f}',
-            ),
-            go.Scatter(x=t_monthly[mask], y=ex_monthly[mask]-sd_monthly[mask], 
-                       mode='lines', 
-                       fill='tonexty',
-                       fillcolor='rgba(242,242,242,0.1)',                               # grey
-                       connectgaps=True,
-                       line=dict(width=1.0, color='rgba(242,242,242,0.2)'),             # grey                  
-                       name='uncertainty',      
-                       showlegend=False,
-#                      hovertemplate='%{y:.2f}',
-            )]         
-
+             
         trace_obs = [
             go.Scatter(x=t_monthly, y=ts_monthly, 
                 mode='lines+markers', 
@@ -789,7 +768,17 @@ def update_plot_adjustments(value):
                 name='O',
 #               hovertemplate='%{y:.2f}',
             )]   
-        
+
+        trace_obs_adjusted = [
+               
+            go.Scatter(x=x[mask], y=ts_monthly + y_means, 
+                    mode='lines+markers', 
+                    line=dict(width=1.0, color='rgba(234, 89, 78, 1.0)'),                 # red (colorsafe)
+                    marker=dict(size=2, opacity=0.5, color='rgba(234, 89, 78, 1.0)'),     # red (colorsafe)
+                    name='O (adjusted)',                
+    #               hovertemplate='%{y:.2f}', 
+            )]
+                    
         trace_adjustments = [
                
             go.Scatter(x=x[mask], y=y_means, 
@@ -799,8 +788,8 @@ def update_plot_adjustments(value):
                     name='adjustment',                
     #               hovertemplate='%{y:.2f}', 
             )]
-          	                                          
-        data = data + trace_error + trace_obs + trace_adjustments 
+                      	                                          
+        data = data + trace_obs + trace_obs_adjusted + trace_adjustments
                                      
     fig = go.Figure(data)
     fig.update_layout(
