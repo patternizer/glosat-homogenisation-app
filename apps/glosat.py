@@ -284,7 +284,7 @@ def update_plot_worldmap(value):
 
     lats = df_temp.groupby('stationcode').mean()["stationlat"].values
     lons = df_temp.groupby('stationcode').mean()["stationlon"].values
-    dists = prepare_dists( lats, lons )        
+#   dists = prepare_dists( lats, lons )        
     da = df_temp[ df_temp['stationcode'] == df_temp['stationcode'].unique()[value] ].sort_values(by='year').reset_index(drop=True)    
     lat = [ df_temp[df_temp['stationcode']==df_temp['stationcode'].unique()[value]]['stationlat'].iloc[0] ]
     lon = [ df_temp[df_temp['stationcode']==df_temp['stationcode'].unique()[value]]['stationlon'].iloc[0] ]
@@ -296,8 +296,8 @@ def update_plot_worldmap(value):
     
     fig = go.Figure(
 #	px.set_mapbox_access_token(open(".mapbox_token").read()),
-        px.scatter_mapbox(da, lat='stationlat', lon='stationlon', color_discrete_sequence=['rgba(234, 89, 78, 1.0)'], size_max=10, zoom=10, opacity=0.7)
-#        px.scatter_mapbox(lat=df['stationlat'], lon=df['stationlon'], text=df.index, color_discrete_sequence=['rgba(234, 89, 78, 1.0)'], zoom=3, opacity=0.7)
+#        px.scatter_mapbox(da, lat='stationlat', lon='stationlon', color_discrete_sequence=['rgba(234, 89, 78, 1.0)'], size_max=10, zoom=10, opacity=0.7)
+        px.scatter_mapbox(lat=df['stationlat'], lon=df['stationlon'], text=df.index, color_discrete_sequence=['rgba(234, 89, 78, 1.0)'], zoom=3, opacity=0.7)
 #        dl.Map([dl.TileLayer(), cluster], center=(33, 33), zoom=3, id="map", style={'width': '100%', 'height': '50vh', 'margin': "auto", "display": "block"}),
    )
  
