@@ -34,20 +34,34 @@ import dash_core_components as dcc
 import dash_html_components as html
 from dash.dependencies import Input, Output
 import dash_bootstrap_components as dbc
+import dash_leaflet as dl
+import dash_leaflet.express as dlx
+from dash import Dash
+from dash_extensions.javascript import assign
 
 from apps import home, about, glosat
 from app import app
+
+#------------------------------------------------------------------------------
+import filter_cru_dft as cru_filter # CRU DFT filter
+import cru_changepoint_detector as cru # CRU changepoint detector
+#------------------------------------------------------------------------------
 
 #------------------------------------------------------------------------------
 # SETTINGS: 
 #------------------------------------------------------------------------------
 
 fontsize = 12
-nsmooth = 60
-reduce_precision = False
+
+# Seasonal mean parameters
+
+nsmooth = 60                 # 5yr MA monthly
+nfft = 16                    # power of 2 for the DFT
+w = 10                       # decadal seasonal means 
 
 df_temp = pd.read_pickle('df_temp_expect.pkl', compression='bz2')
 
+reduce_precision = False
 if reduce_precision == True:
 
     # PRECISION: --> int16 and float16
@@ -75,7 +89,6 @@ if reduce_precision == True:
 
 gb = df_temp.groupby(['stationcode'])['stationname'].unique().reset_index()
 stationcodestr = gb['stationcode']
-#stationnamestr = gb['stationname'].apply(', '.join).str.lower()
 stationnamestr = [ gb['stationname'][i][0] for i in range(len(stationcodestr)) ]
 stationstr = stationcodestr + ': ' + stationnamestr
 opts = [{'label' : stationstr[i], 'value' : i} for i in range(len(stationstr))]
@@ -116,9 +129,12 @@ def prepare_dists(lats, lons):
     dists[i,:] = 6371.0*np.arccos( np.minimum( (np.sin(las[i])*np.sin(las) + np.cos(las[i])*np.cos(las)*np.cos(lns[i]-lns) ), 1.0 ) )
   return dists
 
-#----------------------------------------------------------------------------------
-import cru_changepoint_detector as cru # CRU changepoint detector
-#----------------------------------------------------------------------------------
+def smooth_fft(x, span):  
+    
+    y_lo, y_hi, zvarlo, zvarhi, fc, pctl = cru_filter.cru_filter_dft(x, span)    
+    x_filtered = y_lo
+
+    return x_filtered
 
 #------------------------------------------------------------------------------
 # GloSAT APP LAYOUT
@@ -153,12 +169,40 @@ layout = html.Div([
             width={'size':6}, 
             ),                        
 
-#            dbc.Col(html.Div([
-#                dcc.Graph(id="plot-worldmap", style = {'padding' : '10px', 'width': '100%', #'display': 'inline-block'}),                                    
-#            ]), 
-#            width={'size':6}, 
-#            ),           
+            dbc.Col(html.Div([
+                dcc.Graph(id="plot-worldmap", style = {'padding' : '10px', 'width': '100%', 'display': 'inline-block'}),                                    
+            ]), 
+            width={'size':6}, 
+            ),           
+        ]),
 
+        dbc.Row([
+            dbc.Col(html.Div([
+                dcc.Graph(id="plot-changepoints", style = {'padding' : '10px', 'width': '100%', 'display': 'inline-block'}),                                    
+            ]), 
+            width={'size':6}, 
+            ),           
+            dbc.Col(html.Div([                    
+                dcc.Graph(id="plot-differences", style = {'padding' : '10px', 'width': '100%', 'display': 'inline-block'}),                                     
+            ]), 
+            width={'size':6}, 
+            ),                        
+        ]),
+
+        dbc.Row([
+            dbc.Col(html.Div([                    
+                dcc.Graph(id="plot-adjustments", style = {'padding' : '10px', 'width': '100%', 'display': 'inline-block'}),                                     
+            ]), 
+            width={'size':6}, 
+            ),                        
+            dbc.Col(html.Div([
+                dcc.Graph(id="plot-seasonal", style = {'padding' : '10px', 'width': '100%', 'display': 'inline-block'}),                                    
+            ]), 
+            width={'size':6}, 
+            ),           
+        ]),
+        
+        dbc.Row([
             dbc.Col(html.Div([     
                 html.Br(),
                 html.Label(['Status: Experimental']),
@@ -170,35 +214,7 @@ layout = html.Div([
             style = {'padding' : '10px', 'width': '100%', 'display': 'inline-block'}),    
             width={'size':6}, 
             ),
-
         ]),
-
-        dbc.Row([
-            dbc.Col(html.Div([                    
-                dcc.Graph(id="plot-differences", style = {'padding' : '10px', 'width': '100%', 'display': 'inline-block'}),                                     
-            ]), 
-            width={'size':6}, 
-            ),                        
-            dbc.Col(html.Div([
-                dcc.Graph(id="plot-changepoints", style = {'padding' : '10px', 'width': '100%', 'display': 'inline-block'}),                                    
-            ]), 
-            width={'size':6}, 
-            ),           
-        ]),
-        
-#        dbc.Row([
-#            dbc.Col(html.Div([     
-#                html.Br(),
-#                html.Label(['Status: Experimental']),
-#                html.Br(),
-#                html.Label(['Dataset: GloSAT.p03']),
-#                html.Br(),
-#                html.Label(['Codebase: ', html.A('Github', href='https://github.com/patternizer/glosat-homogenisation')]),                
-#            ],
-#            style = {'padding' : '10px', 'width': '100%', 'display': 'inline-block'}),    
-#            width={'size':6}, 
-#            ),
-#        ]),
             
     ]),
 ])
@@ -257,7 +273,7 @@ def update_station_info(value):
     Output(component_id='plot-worldmap', component_property='figure'),
     [Input(component_id='station', component_property='value')],                   
     )
-
+            
 def update_plot_worldmap(value):
     
     """
@@ -281,9 +297,9 @@ def update_plot_worldmap(value):
     fig = go.Figure(
 #	px.set_mapbox_access_token(open(".mapbox_token").read()),
 #        px.scatter_mapbox(da, lat='stationlat', lon='stationlon', color_discrete_sequence=["red"], size_max=10, zoom=10, opacity=0.7)
-#        px.scatter_mapbox(lat=df['stationlat'].round(2), lon=df['stationlon'].round(2), text=df.index, color_discrete_sequence=["red"], zoom=3, opacity=0.7)        
-        px.scatter_mapbox(lat=df['stationlat'], lon=df['stationlon'], text=df.index, color_discrete_sequence=["red"], zoom=3, opacity=0.7)        
-    )
+        px.scatter_mapbox(lat=df['stationlat'], lon=df['stationlon'], text=df.index, color_discrete_sequence=['rgba(234, 89, 78, 1.0)'], zoom=3, opacity=0.7)
+#        dl.Map([dl.TileLayer(), cluster], center=(33, 33), zoom=3, id="map", style={'width': '100%', 'height': '50vh', 'margin': "auto", "display": "block"}),
+   )
  
     fig.update_layout(
        template = "plotly_dark",
@@ -311,8 +327,6 @@ def update_plot_timeseries(value):
     """
     Plot station timeseries
     """
-
-#   value = 5630
 
     df = df_temp[ df_temp['stationcode'] == df_temp['stationcode'].unique()[value] ].sort_values(by='year').reset_index(drop=True).dropna()
     dt = df.groupby('year').mean().iloc[:,0:12]
@@ -620,16 +634,43 @@ def update_plot_changepoints(value):
                        showlegend=False,
 #                      hovertemplate='%{y:.2f}',                       
        )]
-                
+          	                                          
     data = data + trace_ltr_cumsum + trace_ltr + trace_ltr_diff + trace_6_sigma
-                                      
+                                     
     fig = go.Figure(data)
     fig.update_layout(
         template = "plotly_dark",
 #       template = None,
         xaxis = dict(range=[x[0],x[-1]]),       
         yaxis_title = {'text': 'CUSUM'},
-        title = {'text': 'CHANGEPOINTS', 'x':0.1, 'y':0.95},        
+        title = {'text': 'CHANGEPOINTS', 'x':0.1, 'y':0.95},      
+
+#	for j in range(len(breakpoints)):        
+#		    if (j%2 == 0) & (j<len(breakpoints)-1):
+#			plt.fill_betweenx(ylimits, breakpoints[j], breakpoints[j+1], facecolor='lightgrey', alpha=0.5, zorder=0)
+#		    elif (j%2 != 0) & (j<len(breakpoints)-1):        
+#			plt.fill_betweenx(ylimits, breakpoints[j], breakpoints[j+1], facecolor='grey', alpha=0.5, zorder=0)         
+#		    if j == 0:              
+#			plt.fill_betweenx(ylimits, x[mask][0], breakpoints[j], facecolor='grey', alpha=0.5, zorder=0)         
+#		    if (j == len(breakpoints)-1) & (j%2 == 0):              
+#			plt.fill_betweenx(ylimits, breakpoints[j], x[mask][-1], facecolor='lightgrey', alpha=0.5, zorder=0)         
+#		    if (j == len(breakpoints)-1) & (j%2 != 0):              
+#			plt.fill_betweenx(ylimits, breakpoints[j], x[mask][-1], facecolor='grey', alpha=0.5, zorder=0)      
+
+ #       shapes=[
+#		dict(
+#		    type="rect",
+#		    xref="x",
+#		    yref="y",
+#		    x0=breakpoints[0],
+#		    y0="-50",
+#		    x1=breakpoints[1],
+#		    y1="150",
+#		    fillcolor="lightgray",
+#		    opacity=0.4,
+#		    line_width=0,
+#		    layer="below"
+#		)],                          
     )
 
     if mask.sum() == 0:
@@ -650,6 +691,7 @@ def update_plot_changepoints(value):
                 )
             ]
         )    
+    
     fig.update_layout(
         legend=dict(
             orientation='h',
@@ -662,6 +704,289 @@ def update_plot_changepoints(value):
     
     return fig
        
+@app.callback(
+    Output(component_id='plot-adjustments', component_property='figure'),
+    [Input(component_id='station', component_property='value')],    
+    )
+    
+def update_plot_adjustments(value):
+    
+    """
+    Plot station timeseries adjustments
+    """
+
+    df = df_temp[ df_temp['stationcode'] == df_temp['stationcode'].unique()[value] ].sort_values(by='year').reset_index(drop=True).dropna()
+    dt = df.groupby('year').mean().iloc[:,0:12]
+    dn_array = np.array( df.groupby('year').mean().iloc[:,19:31] )
+    dn = dt.copy()
+    dn.iloc[:,0:] = dn_array
+    da = (dt - dn).reset_index()
+    de = (df.groupby('year').mean().iloc[:,31:43]).reset_index()
+    sd = (df.groupby('year').mean().iloc[:,43:55]).reset_index()        
+    ts_monthly = np.array( da.groupby('year').mean().iloc[:,0:12]).ravel()    
+    ex_monthly = np.array( de.groupby('year').mean().iloc[:,0:12]).ravel()    
+    sd_monthly = np.array( sd.groupby('year').mean().iloc[:,0:12]).ravel()                   
+    ts_monthly = np.array( moving_average( ts_monthly, nsmooth ) )    
+    ex_monthly = np.array( moving_average( ex_monthly, nsmooth ) )    
+    sd_monthly = np.array( moving_average( sd_monthly, nsmooth ) )    
+    diff_monthly = ts_monthly - ex_monthly
+    # Solve Y1677-Y2262 Pandas bug with Xarray:        
+    t_monthly = xr.cftime_range(start=str(da['year'].iloc[0]), periods=len(ts_monthly), freq='M', calendar='noleap')     
+    mask = np.isfinite(ex_monthly) & np.isfinite(ts_monthly)    
+         
+    # CALCULATE: CUSUM
+    	
+    x = t_monthly[mask]
+    y = np.cumsum( diff_monthly[mask] )
+
+    # CALL: cru_changepoint_detector
+
+    y_fit, y_fit_diff, breakpoints, depth, r, R2adj = cru.changepoint_detector(x, y)
+    breakpoints_all = x[mask][ np.abs(y_fit_diff) >= np.abs(np.nanmean(y_fit_diff)) + 6.0*np.abs(np.nanstd(y_fit_diff)) ][0:]    
+    breakpoints_idx = np.arange(len(x[mask]))[ np.abs(y_fit_diff) >= np.abs(np.nanmean(y_fit_diff)) + 6.0*np.abs(np.nanstd(y_fit_diff)) ][0:]        
+       
+    # CALCULATE: intra-breakpoint fragment means
+    
+    y_means = []
+    for j in range(len(breakpoints_all)+1):                
+        if j == 0:              
+            y_means = y_means + list( len( ts_monthly[mask][0:breakpoints_idx[0]] ) * [ np.nanmean(ts_monthly[mask][0:breakpoints_idx[0]]) ] ) 
+        if (j > 0) & (j<len(breakpoints_all)):
+            y_means = y_means + list( len( ts_monthly[mask][breakpoints_idx[j-1]:breakpoints_idx[j]] ) * [ np.nanmean(ts_monthly[mask][breakpoints_idx[j-1]:breakpoints_idx[j]]) ] ) 
+        if (j == len(breakpoints_all)):              
+            y_means = y_means + list( len( ts_monthly[mask][breakpoints_idx[-1]:] ) * [ np.nanmean(ts_monthly[mask][breakpoints_idx[-1]:]) ] ) 
+    
+    if mask.sum() > 0:
+
+        data = []
+        
+        trace_error = [
+            go.Scatter(x=t_monthly[mask], y=ex_monthly[mask]+sd_monthly[mask], 
+                       mode='lines', 
+                       fill='none',
+                       connectgaps=True,
+                       line=dict(width=1.0, color='rgba(242,242,242,0.2)'),             # grey                  
+                       name='uncertainty',      
+                       showlegend=False,
+#                      hovertemplate='%{y:.2f}',
+            ),
+            go.Scatter(x=t_monthly[mask], y=ex_monthly[mask]-sd_monthly[mask], 
+                       mode='lines', 
+                       fill='tonexty',
+                       fillcolor='rgba(242,242,242,0.1)',                               # grey
+                       connectgaps=True,
+                       line=dict(width=1.0, color='rgba(242,242,242,0.2)'),             # grey                  
+                       name='uncertainty',      
+                       showlegend=False,
+#                      hovertemplate='%{y:.2f}',
+            )]         
+
+        trace_obs = [
+            go.Scatter(x=t_monthly, y=ts_monthly, 
+                mode='lines+markers', 
+                line=dict(width=1.0, color='rgba(20,115,175,1.0)'),                  # blue (colorsafe)
+                marker=dict(size=5, opacity=0.5, color='rgba(20,115,175,1.0)'),      # blue (colorsafe)
+                name='O',
+#               hovertemplate='%{y:.2f}',
+            )]   
+        
+        trace_adjustments = [
+               
+            go.Scatter(x=x[mask], y=y_means, 
+                    mode='lines+markers', 
+                    line=dict(width=1.0, color='rgba(229, 176, 57, 1.0)'),                 # mustard (colorsafe)
+                    marker=dict(size=2, opacity=0.5, color='rgba(229, 176, 57, 1.0)'),     # mustard (colorsafe)
+                    name='fragment mean',                
+    #               hovertemplate='%{y:.2f}', 
+            )]
+          	                                          
+        data = data + trace_error + trace_obs + trace_adjustments 
+                                     
+    fig = go.Figure(data)
+    fig.update_layout(
+        template = "plotly_dark",
+#       template = None,
+        xaxis = dict(range=[x[0],x[-1]]),       
+        yaxis_title = {'text': 'Anomaly (from 1961-1990), °C'},
+        title = {'text': 'ADJUSTMENTS', 'x':0.1, 'y':0.95},      
+
+#	for j in range(len(breakpoints)):        
+#		    if (j%2 == 0) & (j<len(breakpoints)-1):
+#			plt.fill_betweenx(ylimits, breakpoints[j], breakpoints[j+1], facecolor='lightgrey', alpha=0.5, zorder=0)
+#		    elif (j%2 != 0) & (j<len(breakpoints)-1):        
+#			plt.fill_betweenx(ylimits, breakpoints[j], breakpoints[j+1], facecolor='grey', alpha=0.5, zorder=0)         
+#		    if j == 0:              
+#			plt.fill_betweenx(ylimits, x[mask][0], breakpoints[j], facecolor='grey', alpha=0.5, zorder=0)         
+#		    if (j == len(breakpoints)-1) & (j%2 == 0):              
+#			plt.fill_betweenx(ylimits, breakpoints[j], x[mask][-1], facecolor='lightgrey', alpha=0.5, zorder=0)         
+#		    if (j == len(breakpoints)-1) & (j%2 != 0):              
+#			plt.fill_betweenx(ylimits, breakpoints[j], x[mask][-1], facecolor='grey', alpha=0.5, zorder=0)      
+
+ #       shapes=[
+#		dict(
+#		    type="rect",
+#		    xref="x",
+#		    yref="y",
+#		    x0=breakpoints[0],
+#		    y0="-50",
+#		    x1=breakpoints[1],
+#		    y1="150",
+#		    fillcolor="lightgray",
+#		    opacity=0.4,
+#		    line_width=0,
+#		    layer="below"
+#		)],                          
+    )
+
+    if mask.sum() == 0:
+        fig.update_layout(
+            annotations=[
+                dict(
+                    x=t_yearly[np.floor(len(t_monthly)/2).astype(int)],
+                    y=0,
+                    xref="x",
+                    yref="y",
+                    text="No baseline anomaly",
+                    showarrow=False,
+                    font=dict(
+                        family="Courier New, monospace",
+                        size=16,
+                        color="#ffffff"
+                        ),                    
+                )
+            ]
+        )    
+    
+    fig.update_layout(
+        legend=dict(
+            orientation='h',
+            yanchor="top",
+            y=0.1,
+            xanchor="left",
+            x=0.05),              
+    )        
+    fig.update_layout(height=400, width=550, margin={"r":10,"t":50,"l":70,"b":50})    
+    
+    return fig
+
+@app.callback(
+    Output(component_id='plot-seasonal', component_property='figure'),
+    [Input(component_id='station', component_property='value')],    
+    )
+
+def update_plot_seasonal(value):
+    
+    """
+    Plot seasonal observations and local expectation
+    """
+
+    da = df_temp[df_temp['stationcode']==df_temp['stationcode'].unique()[value]].iloc[:,range(0,13)]
+
+    # TRIM: to 1678 to work-around Pandas datetime limit
+
+    da = da[da.year >= 1678].reset_index(drop=True)
+
+    ts_monthly = []    
+    for i in range(len(da)):            
+        monthly = da.iloc[i,1:]
+        ts_monthly = ts_monthly + monthly.to_list()    
+    ts_monthly = np.array(ts_monthly)   
+    t_monthly = pd.date_range(start=str(da.year.iloc[0]), periods=len(ts_monthly), freq='MS')    
+    df = pd.DataFrame({'Tg':ts_monthly}, index=t_monthly)     
+
+    t = [ pd.to_datetime( str(df.index.year.unique()[i])+'-01-01') for i in range(len(df.index.year.unique())) ] # years
+    DJF = ( df[df.index.month==12]['Tg'].values + df[df.index.month==1]['Tg'].values + df[df.index.month==2]['Tg'].values ) / 3
+    MAM = ( df[df.index.month==3]['Tg'].values + df[df.index.month==4]['Tg'].values + df[df.index.month==5]['Tg'].values ) / 3
+    JJA = ( df[df.index.month==6]['Tg'].values + df[df.index.month==7]['Tg'].values + df[df.index.month==8]['Tg'].values ) / 3
+    SON = ( df[df.index.month==9]['Tg'].values + df[df.index.month==10]['Tg'].values + df[df.index.month==11]['Tg'].values ) / 3
+    df_seasonal = pd.DataFrame({'DJF':DJF, 'MAM':MAM, 'JJA':JJA, 'SON':SON}, index = t)
+          
+    df_seasonal_ma = df_seasonal.rolling(10, center=True).mean() # decadal smoothing
+    mask = np.isfinite(df_seasonal_ma)
+
+#   dates = pd.date_range(start='1678-01-01', end='2021-12-01', freq='MS')
+    dates = df_seasonal_ma.index
+    df_seasonal_fft = pd.DataFrame(index=dates)
+    df_seasonal_fft['DJF'] = pd.DataFrame({'DJF':smooth_fft(df_seasonal_ma['DJF'].values[mask['DJF']], nfft)}, index=df_seasonal_ma['DJF'].index[mask['DJF']])
+    df_seasonal_fft['MAM'] = pd.DataFrame({'DJF':smooth_fft(df_seasonal_ma['MAM'].values[mask['MAM']], nfft)}, index=df_seasonal_ma['MAM'].index[mask['MAM']])
+    df_seasonal_fft['JJA'] = pd.DataFrame({'DJF':smooth_fft(df_seasonal_ma['JJA'].values[mask['JJA']], nfft)}, index=df_seasonal_ma['JJA'].index[mask['JJA']])
+    df_seasonal_fft['SON'] = pd.DataFrame({'DJF':smooth_fft(df_seasonal_ma['SON'].values[mask['SON']], nfft)}, index=df_seasonal_ma['SON'].index[mask['SON']])
+                
+    mask = np.isfinite(df_seasonal_fft)
+    data = []
+    trace_winter=[
+            go.Scatter(                                  
+                x=df_seasonal_fft.index[mask['DJF']], y=df_seasonal_fft['DJF'][mask['DJF']], 
+                mode='lines+markers', 
+                line=dict(width=3, color='black'),
+                marker=dict(size=7, symbol='square', opacity=1.0, color='blue', line_width=1, line_color='black'),                       
+                name='DJF')
+    ]
+    trace_spring=[
+            go.Scatter(                                  
+                x=df_seasonal_fft.index[mask['MAM']], y=df_seasonal_fft['MAM'][mask['MAM']], 
+                mode='lines+markers', 
+                line=dict(width=3, color='black'),
+                marker=dict(size=7, symbol='square', opacity=1.0, color='red', line_width=1, line_color='black'),       
+                name='MAM')
+    ]
+    trace_summer=[
+            go.Scatter(                                  
+                x=df_seasonal_fft.index[mask['JJA']], y=df_seasonal_fft['JJA'][mask['JJA']], 
+                mode='lines+markers', 
+                line=dict(width=3, color='black'),
+                marker=dict(size=7, symbol='square', opacity=1.0, color='purple', line_width=1, line_color='black'),       
+                name='JJA')
+    ]
+    trace_autumn=[
+            go.Scatter(                                  
+                x=df_seasonal_fft.index[mask['SON']], y=df_seasonal_fft['SON'][mask['SON']], 
+                mode='lines+markers', 
+                line=dict(width=3, color='black'),
+                marker=dict(size=7, symbol='square', opacity=1.0, color='green', line_width=1, line_color='black'),       
+                name='SON')
+    ]
+    data = data + trace_winter + trace_spring + trace_summer + trace_autumn
+                                          
+    fig = go.Figure(data)
+    fig.update_layout(
+        template = "plotly_dark",
+#       template = None,
+        xaxis = dict(range=[dates[0],dates[-1]]),       
+        xaxis_title = {'text': 'Year'},
+        yaxis_title = {'text': 'Anomaly (from 1961-1990), °C'},
+        title = {'text': 'SEASONAL DECADAL MEAN (O)', 'x':0.1, 'y':0.95},
+    )
+
+    if mask.sum().all() == 0:
+        fig.update_layout(
+            annotations=[
+                dict(
+                    x=dates[np.floor(len(dates)/2).astype(int)],
+                    y=0,
+                    xref="x",
+                    yref="y",
+                    text="No baseline anomaly",
+                    showarrow=False,
+                    font=dict(
+                        family="Courier New, monospace",
+                        size=16,
+                        color="#ffffff"
+                        ),                    
+                )
+            ]
+        )    
+    fig.update_layout(legend=dict(
+        orientation='v',
+        yanchor="top",
+        y=0.4,
+        xanchor="left",
+        x=0.8),
+    )    
+    fig.update_layout(height=400, width=550, margin={"r":10,"t":50,"l":70,"b":50})    
+
+    return fig
+
 ##################################################################################################
 # Run the dash app
 ##################################################################################################

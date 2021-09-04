@@ -75,8 +75,7 @@ def changepoint_detector(x,y):
         max_bins = max_bins,
         max_depth = depth
         ).fit(x_obs, y_obs)            
-        y_fit = lt.predict(x_obs)    
-	       
+        y_fit = lt.predict(x_obs)    	       
         Y = y_obs
         Z = y_fit.reshape(-1,1)
         mask_ols = np.isfinite(Y) & np.isfinite(Z)

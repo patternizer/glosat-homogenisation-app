@@ -14,6 +14,7 @@ import dash_core_components as dcc
 import dash_html_components as html
 from dash.dependencies import Input, Output
 import dash_bootstrap_components as dbc
+import dash_leaflet as dl
 
 from apps import home, about, glosat
 from app import app
