@@ -55,9 +55,8 @@ fontsize = 12
 
 # Seasonal mean parameters
 
-nsmooth = 60                 # 5yr MA monthly
-nfft = 16                    # power of 2 for the DFT
-w = 10                       # decadal seasonal means 
+nsmooth = 12                  # 1yr MA monthly
+nfft = 10                     # decadal smoothing
 
 df_temp = pd.read_pickle('df_temp_expect.pkl', compression='bz2')
 
@@ -373,8 +372,8 @@ def update_plot_timeseries(value):
         trace_expect = [            
             go.Scatter(x=t_monthly, y=ex_monthly, 
                 mode='lines+markers', 
-                line=dict(width=1.0, color='rgba(234, 89, 78, 1.0)'),                 # orange (colorsafe)
-                marker=dict(size=5, opacity=0.5, color='rgba(234, 89, 78, 1.0)'),     # orange (colorsafe)
+                line=dict(width=1.0, color='rgba(234, 89, 78, 1.0)'),                 # red (colorsafe)
+                marker=dict(size=5, opacity=0.5, color='rgba(234, 89, 78, 1.0)'),     # red (colorsafe)
                 name='E',
 #               hovertemplate='%{y:.2f}',
             )]
@@ -750,16 +749,38 @@ def update_plot_adjustments(value):
     y_means = []
     for j in range(len(breakpoints_all)+1):                
         if j == 0:              
-            y_means = y_means + list( len( ts_monthly[mask][0:breakpoints_idx[0]] ) * [ np.nanmean(ts_monthly[mask][0:breakpoints_idx[0]]) - np.nanmean(ex_monthly[mask][0:breakpoints_idx[0]]) ] ) 
+            y_means = y_means + list( len( ts_monthly[mask][0:breakpoints_idx[0]] ) * [ -np.nanmean(ts_monthly[mask][0:breakpoints_idx[0]]) + np.nanmean(ex_monthly[mask][0:breakpoints_idx[0]]) ] ) 
         if (j > 0) & (j<len(breakpoints_all)):
-            y_means = y_means + list( len( ts_monthly[mask][breakpoints_idx[j-1]:breakpoints_idx[j]] ) * [ np.nanmean(ts_monthly[mask][breakpoints_idx[j-1]:breakpoints_idx[j]]) - np.nanmean(ex_monthly[mask][breakpoints_idx[j-1]:breakpoints_idx[j]]) ] ) 
+            y_means = y_means + list( len( ts_monthly[mask][breakpoints_idx[j-1]:breakpoints_idx[j]] ) * [ -np.nanmean(ts_monthly[mask][breakpoints_idx[j-1]:breakpoints_idx[j]]) + np.nanmean(ex_monthly[mask][breakpoints_idx[j-1]:breakpoints_idx[j]]) ] ) 
         if (j == len(breakpoints_all)):              
-            y_means = y_means + list( len( ts_monthly[mask][breakpoints_idx[-1]:] ) * [ np.nanmean(ts_monthly[mask][breakpoints_idx[-1]:]) - np.nanmean(ex_monthly[mask][breakpoints_idx[-1]:]) ] ) 
+            y_means = y_means + list( len( ts_monthly[mask][breakpoints_idx[-1]:] ) * [ -np.nanmean(ts_monthly[mask][breakpoints_idx[-1]:]) + np.nanmean(ex_monthly[mask][breakpoints_idx[-1]:]) ] ) 
     
     if mask.sum() > 0:
 
         data = []
-             
+                         
+        trace_error = [
+            go.Scatter(x=t_monthly[mask], y=ex_monthly[mask]+sd_monthly[mask], 
+                       mode='lines', 
+                       fill='none',
+                       connectgaps=True,
+                       line=dict(width=1.0, color='rgba(242,242,242,0.2)'),             # grey                  
+                       name='uncertainty',      
+                       showlegend=False,
+#                      hovertemplate='%{y:.2f}',
+            ),
+            go.Scatter(x=t_monthly[mask], y=ex_monthly[mask]-sd_monthly[mask], 
+                       mode='lines', 
+                       fill='tonexty',
+                       fillcolor='rgba(242,242,242,0.1)',                               # grey
+                       connectgaps=True,
+                       line=dict(width=1.0, color='rgba(242,242,242,0.2)'),             # grey                  
+
+                       name='uncertainty',      
+                       showlegend=False,
+#                      hovertemplate='%{y:.2f}',
+            )]   
+            	
         trace_obs = [
             go.Scatter(x=t_monthly, y=ts_monthly, 
                 mode='lines+markers', 
@@ -769,12 +790,21 @@ def update_plot_adjustments(value):
 #               hovertemplate='%{y:.2f}',
             )]   
 
+        trace_expect = [            
+            go.Scatter(x=t_monthly, y=ex_monthly, 
+                mode='lines+markers', 
+                line=dict(width=1.0, color='rgba(234, 89, 78, 1.0)'),                 # red (colorsafe)
+                marker=dict(size=5, opacity=0.5, color='rgba(234, 89, 78, 1.0)'),     # red (colorsafe)
+                name='E',
+#               hovertemplate='%{y:.2f}',
+            )]
+
         trace_obs_adjusted = [
                
             go.Scatter(x=x[mask], y=ts_monthly + y_means, 
                     mode='lines+markers', 
-                    line=dict(width=1.0, color='rgba(234, 89, 78, 1.0)'),                 # red (colorsafe)
-                    marker=dict(size=2, opacity=0.5, color='rgba(234, 89, 78, 1.0)'),     # red (colorsafe)
+                    line=dict(width=1.0, color='rgba(137, 195, 239, 1.0)'),                 # lightblue (colorsafe)
+                    marker=dict(size=2, opacity=0.5, color='rgba(137, 195, 239, 1.0)'),     # lightblue (colorsafe)
                     name='O (adjusted)',                
     #               hovertemplate='%{y:.2f}', 
             )]
@@ -789,7 +819,8 @@ def update_plot_adjustments(value):
     #               hovertemplate='%{y:.2f}', 
             )]
                       	                                          
-        data = data + trace_obs + trace_obs_adjusted + trace_adjustments
+#        data = data + trace_error + trace_adjustments + trace_obs_adjusted + trace_expect + trace_obs
+        data = data + trace_error + trace_expect + trace_obs + trace_obs_adjusted + trace_adjustments 
                                      
     fig = go.Figure(data)
     fig.update_layout(
@@ -797,7 +828,7 @@ def update_plot_adjustments(value):
 #       template = None,
         xaxis = dict(range=[x[0],x[-1]]),       
         yaxis_title = {'text': 'Anomaly (from 1961-1990), °C'},
-        title = {'text': 'ADJUSTMENTS', 'x':0.1, 'y':0.95},      
+        title = {'text': 'ADJUSTMENTS (E-O)', 'x':0.1, 'y':0.95},      
 
 #	for j in range(len(breakpoints)):        
 #		    if (j%2 == 0) & (j<len(breakpoints)-1):
@@ -866,28 +897,52 @@ def update_plot_adjustments(value):
 def update_plot_seasonal(value):
     
     """
-    Plot seasonal observations and local expectation
+    Plot seasonal local expectations
     """
 
-    da = df_temp[df_temp['stationcode']==df_temp['stationcode'].unique()[value]].iloc[:,range(0,13)]
+#    da = df_temp[df_temp['stationcode']==df_temp['stationcode'].unique()[value]].iloc[:,range(0,13)]
 
-    # TRIM: to 1678 to work-around Pandas datetime limit
+#    # TRIM: to 1678 to work-around Pandas datetime limit
 
+#    da = da[da.year >= 1678].reset_index(drop=True)
+
+#    ts_monthly = []    
+#    for i in range(len(da)):            
+#        monthly = da.iloc[i,1:]
+#        ts_monthly = ts_monthly + monthly.to_list()    
+#    ts_monthly = np.array(ts_monthly)   
+#    t_monthly = pd.date_range(start=str(da.year.iloc[0]), periods=len(ts_monthly), freq='MS')    
+
+    df = df_temp[ df_temp['stationcode'] == df_temp['stationcode'].unique()[value] ].sort_values(by='year').reset_index(drop=True).dropna()
+    dt = df.groupby('year').mean().iloc[:,0:12]
+    dn_array = np.array( df.groupby('year').mean().iloc[:,19:31] )
+    dn = dt.copy()
+    dn.iloc[:,0:] = dn_array
+    da = (dt - dn).reset_index()
+    de = (df.groupby('year').mean().iloc[:,31:43]).reset_index()
+    sd = (df.groupby('year').mean().iloc[:,43:55]).reset_index()      
+    
     da = da[da.year >= 1678].reset_index(drop=True)
+    de = de[de.year >= 1678].reset_index(drop=True)
+    sd = sd[sd.year >= 1678].reset_index(drop=True)
+          
+    ts_monthly = np.array( da.groupby('year').mean().iloc[:,0:12]).ravel()    
+    ex_monthly = np.array( de.groupby('year').mean().iloc[:,0:12]).ravel()    
+    sd_monthly = np.array( sd.groupby('year').mean().iloc[:,0:12]).ravel()                   
+    ts_monthly = np.array( moving_average( ts_monthly, nsmooth ) )    
+    ex_monthly = np.array( moving_average( ex_monthly, nsmooth ) )    
+    sd_monthly = np.array( moving_average( sd_monthly, nsmooth ) )    
 
-    ts_monthly = []    
-    for i in range(len(da)):            
-        monthly = da.iloc[i,1:]
-        ts_monthly = ts_monthly + monthly.to_list()    
-    ts_monthly = np.array(ts_monthly)   
+    trim_months = len(ts_monthly)%12
+ 
     t_monthly = pd.date_range(start=str(da.year.iloc[0]), periods=len(ts_monthly), freq='MS')    
-    df = pd.DataFrame({'Tg':ts_monthly}, index=t_monthly)     
-
-    t = [ pd.to_datetime( str(df.index.year.unique()[i])+'-01-01') for i in range(len(df.index.year.unique())) ] # years
-    DJF = ( df[df.index.month==12]['Tg'].values + df[df.index.month==1]['Tg'].values + df[df.index.month==2]['Tg'].values ) / 3
-    MAM = ( df[df.index.month==3]['Tg'].values + df[df.index.month==4]['Tg'].values + df[df.index.month==5]['Tg'].values ) / 3
-    JJA = ( df[df.index.month==6]['Tg'].values + df[df.index.month==7]['Tg'].values + df[df.index.month==8]['Tg'].values ) / 3
-    SON = ( df[df.index.month==9]['Tg'].values + df[df.index.month==10]['Tg'].values + df[df.index.month==11]['Tg'].values ) / 3
+    df = pd.DataFrame({'Tg':ex_monthly[:-1-trim_months]}, index=t_monthly[:-1-trim_months])     
+    
+    t = [ pd.to_datetime( str(df.index.year.unique()[i])+'-01-01') for i in range(len(df.index.year.unique())) ][1:] # years
+    DJF = ( df[df.index.month==12]['Tg'].values + df[df.index.month==1]['Tg'].values[1:] + df[df.index.month==2]['Tg'].values[1:] ) / 3
+    MAM = ( df[df.index.month==3]['Tg'].values[1:] + df[df.index.month==4]['Tg'].values[1:] + df[df.index.month==5]['Tg'].values[1:] ) / 3
+    JJA = ( df[df.index.month==6]['Tg'].values[1:] + df[df.index.month==7]['Tg'].values[1:] + df[df.index.month==8]['Tg'].values[1:] ) / 3
+    SON = ( df[df.index.month==9]['Tg'].values[1:] + df[df.index.month==10]['Tg'].values[1:] + df[df.index.month==11]['Tg'].values[1:] ) / 3
     df_seasonal = pd.DataFrame({'DJF':DJF, 'MAM':MAM, 'JJA':JJA, 'SON':SON}, index = t)
           
     df_seasonal_ma = df_seasonal.rolling(10, center=True).mean() # decadal smoothing
@@ -944,7 +999,7 @@ def update_plot_seasonal(value):
         xaxis = dict(range=[dates[0],dates[-1]]),       
         xaxis_title = {'text': 'Year'},
         yaxis_title = {'text': 'Anomaly (from 1961-1990), °C'},
-        title = {'text': 'SEASONAL DECADAL MEANS (O)', 'x':0.1, 'y':0.95},
+        title = {'text': 'SEASONAL DECADAL EXPECTATIONS (E)', 'x':0.1, 'y':0.95},
     )
 
     if mask.sum().all() == 0:
