@@ -296,8 +296,8 @@ def update_plot_worldmap(value):
     
     fig = go.Figure(
 #	px.set_mapbox_access_token(open(".mapbox_token").read()),
-#        px.scatter_mapbox(da, lat='stationlat', lon='stationlon', color_discrete_sequence=["red"], size_max=10, zoom=10, opacity=0.7)
-        px.scatter_mapbox(lat=df['stationlat'], lon=df['stationlon'], text=df.index, color_discrete_sequence=['rgba(234, 89, 78, 1.0)'], zoom=3, opacity=0.7)
+        px.scatter_mapbox(da, lat='stationlat', lon='stationlon', color_discrete_sequence=['rgba(234, 89, 78, 1.0)'], size_max=10, zoom=10, opacity=0.7)
+#        px.scatter_mapbox(lat=df['stationlat'], lon=df['stationlon'], text=df.index, color_discrete_sequence=['rgba(234, 89, 78, 1.0)'], zoom=3, opacity=0.7)
 #        dl.Map([dl.TileLayer(), cluster], center=(33, 33), zoom=3, id="map", style={'width': '100%', 'height': '50vh', 'margin': "auto", "display": "block"}),
    )
  
@@ -750,11 +750,11 @@ def update_plot_adjustments(value):
     y_means = []
     for j in range(len(breakpoints_all)+1):                
         if j == 0:              
-            y_means = y_means + list( len( ts_monthly[mask][0:breakpoints_idx[0]] ) * [ np.nanmean(ts_monthly[mask][0:breakpoints_idx[0]]) ] ) 
+            y_means = y_means + list( len( ts_monthly[mask][0:breakpoints_idx[0]] ) * [ np.nanmean(ts_monthly[mask][0:breakpoints_idx[0]]) - np.nanmean(ex_monthly[mask][0:breakpoints_idx[0]]) ] ) 
         if (j > 0) & (j<len(breakpoints_all)):
-            y_means = y_means + list( len( ts_monthly[mask][breakpoints_idx[j-1]:breakpoints_idx[j]] ) * [ np.nanmean(ts_monthly[mask][breakpoints_idx[j-1]:breakpoints_idx[j]]) ] ) 
+            y_means = y_means + list( len( ts_monthly[mask][breakpoints_idx[j-1]:breakpoints_idx[j]] ) * [ np.nanmean(ts_monthly[mask][breakpoints_idx[j-1]:breakpoints_idx[j]]) - np.nanmean(ex_monthly[mask][breakpoints_idx[j-1]:breakpoints_idx[j]]) ] ) 
         if (j == len(breakpoints_all)):              
-            y_means = y_means + list( len( ts_monthly[mask][breakpoints_idx[-1]:] ) * [ np.nanmean(ts_monthly[mask][breakpoints_idx[-1]:]) ] ) 
+            y_means = y_means + list( len( ts_monthly[mask][breakpoints_idx[-1]:] ) * [ np.nanmean(ts_monthly[mask][breakpoints_idx[-1]:]) - np.nanmean(ex_monthly[mask][breakpoints_idx[-1]:]) ] ) 
     
     if mask.sum() > 0:
 
@@ -796,7 +796,7 @@ def update_plot_adjustments(value):
                     mode='lines+markers', 
                     line=dict(width=1.0, color='rgba(229, 176, 57, 1.0)'),                 # mustard (colorsafe)
                     marker=dict(size=2, opacity=0.5, color='rgba(229, 176, 57, 1.0)'),     # mustard (colorsafe)
-                    name='fragment mean',                
+                    name='adjustment',                
     #               hovertemplate='%{y:.2f}', 
             )]
           	                                          
@@ -955,7 +955,7 @@ def update_plot_seasonal(value):
         xaxis = dict(range=[dates[0],dates[-1]]),       
         xaxis_title = {'text': 'Year'},
         yaxis_title = {'text': 'Anomaly (from 1961-1990), °C'},
-        title = {'text': 'SEASONAL DECADAL MEAN (O)', 'x':0.1, 'y':0.95},
+        title = {'text': 'SEASONAL DECADAL MEANS (O)', 'x':0.1, 'y':0.95},
     )
 
     if mask.sum().all() == 0:
