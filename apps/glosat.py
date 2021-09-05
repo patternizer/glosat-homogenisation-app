@@ -169,25 +169,12 @@ layout = html.Div([
             ]), 
             width={'size':6}, 
             ),                        
-
-            dbc.Col(html.Div([
-                dcc.Graph(id="plot-worldmap", style = {'padding' : '10px', 'width': '100%', 'display': 'inline-block'}),                                    
-            ]), 
-            width={'size':6}, 
-            ),           
-        ]),
-
-        dbc.Row([
-            dbc.Col(html.Div([
-                dcc.Graph(id="plot-changepoints", style = {'padding' : '10px', 'width': '100%', 'display': 'inline-block'}),                                    
-            ]), 
-            width={'size':6}, 
-            ),           
             dbc.Col(html.Div([                    
                 dcc.Graph(id="plot-differences", style = {'padding' : '10px', 'width': '100%', 'display': 'inline-block'}),                                     
             ]), 
             width={'size':6}, 
             ),                        
+
         ]),
 
         dbc.Row([
@@ -197,11 +184,24 @@ layout = html.Div([
             width={'size':6}, 
             ),                        
             dbc.Col(html.Div([
-                dcc.Graph(id="plot-seasonal", style = {'padding' : '10px', 'width': '100%', 'display': 'inline-block'}),                                    
+                dcc.Graph(id="plot-changepoints", style = {'padding' : '10px', 'width': '100%', 'display': 'inline-block'}),                                    
             ]), 
             width={'size':6}, 
             ),           
         ]),
+
+#        dbc.Row([
+#            dbc.Col(html.Div([
+#                dcc.Graph(id="plot-worldmap", style = {'padding' : '10px', 'width': '100%', 'display': 'inline-block'}),                                    
+#            ]), 
+#            width={'size':6}, 
+#            ),           
+#            dbc.Col(html.Div([
+#                dcc.Graph(id="plot-seasonal", style = {'padding' : '10px', 'width': '100%', 'display': 'inline-block'}),                                    
+#            ]), 
+#            width={'size':6}, 
+#            ),           
+#        ]),
         
         dbc.Row([
             dbc.Col(html.Div([     
@@ -508,7 +508,7 @@ def update_plot_differences(value):
 #       template = None,
         xaxis = dict(range=[t_monthly[0],t_monthly[-1]]),       
         yaxis_title = {'text': 'Anomaly (from 1961-1990), °C'},
-        title = {'text': 'DIFFERENCE', 'x':0.1, 'y':0.95},        
+        title = {'text': 'DIFFERENCE (O-E)', 'x':0.1, 'y':0.95},        
     )
 
     if mask.sum() == 0:
@@ -643,7 +643,7 @@ def update_plot_changepoints(value):
         template = "plotly_dark",
 #       template = None,
         xaxis = dict(range=[x[0],x[-1]]),       
-        yaxis_title = {'text': 'CUSUM'},
+        yaxis_title = {'text': 'CUSUM (O-E)'},
         title = {'text': 'CHANGEPOINTS', 'x':0.1, 'y':0.95},      
 
 #	for j in range(len(breakpoints)):        
