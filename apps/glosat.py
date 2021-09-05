@@ -1,8 +1,8 @@
 #------------------------------------------------------------------------------
 # PROGRAM: glosat.py
 #------------------------------------------------------------------------------
-# Version 0.1
-# 31 July, 2020
+# Version 0.15
+# 5 September, 2021
 # Michael Taylor
 # https://patternizer.github.io
 # michael DOT a DOT taylor AT uea DOT ac DOT uk
@@ -210,7 +210,7 @@ layout = html.Div([
                 html.Br(),
                 html.Label(['Dataset: GloSAT.p03']),
                 html.Br(),
-                html.Label(['Codebase: ', html.A('Github', href='https://github.com/patternizer/glosat-homogenisation')]),                
+                html.Label(['Codebase: ', html.A('Github', href='https://github.com/patternizer/glosat-homogenisation-app')]),                
             ],
             style = {'padding' : '10px', 'width': '100%', 'display': 'inline-block'}),    
             width={'size':6}, 
@@ -727,6 +727,7 @@ def update_plot_adjustments(value):
     ts_monthly = np.array( da.groupby('year').mean().iloc[:,0:12]).ravel()    
     ex_monthly = np.array( de.groupby('year').mean().iloc[:,0:12]).ravel()    
     sd_monthly = np.array( sd.groupby('year').mean().iloc[:,0:12]).ravel()                   
+    dn_monthly = np.array( dn.groupby('year').mean().iloc[:,0:12]).ravel()                   
     ts_monthly = np.array( moving_average( ts_monthly, nsmooth ) )    
     ex_monthly = np.array( moving_average( ex_monthly, nsmooth ) )    
     sd_monthly = np.array( moving_average( sd_monthly, nsmooth ) )    
@@ -820,9 +821,8 @@ def update_plot_adjustments(value):
                     name='adjustment',                
     #               hovertemplate='%{y:.2f}', 
             )]
-                      	                                          
-#        data = data + trace_error + trace_adjustments + trace_obs_adjusted + trace_expect + trace_obs
-        data = data + trace_error + trace_expect + trace_obs + trace_obs_adjusted + trace_adjustments 
+                                      	                                          
+        data = data + trace_error + trace_expect + trace_obs + trace_obs_adjusted + trace_adjustments
                                      
     fig = go.Figure(data)
     fig.update_layout(

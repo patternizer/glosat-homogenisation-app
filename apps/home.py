@@ -66,7 +66,7 @@ layout = html.Div([
                 dbc.Card(
                     children=[
                         html.H5(children='Plotly Code', className="text-center"),
-                        dbc.Button("GitHub", href="https://github.com/patternizer/glosat-homogenisation", color="primary", className="mt-2"),
+                        dbc.Button("GitHub", href="https://github.com/patternizer/glosat-homogenisation-app", color="primary", className="mt-2"),
                     ],
                 body=True, color="dark", outline=True),
             width=4, className="mb-2"),
