@@ -355,7 +355,7 @@ def update_plot_timeseries(value):
                        mode='lines', 
                        fill='none',
                        connectgaps=True,
-                       line=dict(width=1.0, color='rgba(242,242,242,0.2)'),             # grey                  
+                       line=dict(width=1.0, color='rgba(242,242,242,0.0)'),             # grey                  
                        name='uncertainty',      
                        showlegend=False,
 #                      hovertemplate='%{y:.2f}',
@@ -363,11 +363,11 @@ def update_plot_timeseries(value):
             go.Scatter(x=t_monthly[mask], y=ex_monthly[mask]-sd_monthly[mask], 
                        mode='lines', 
                        fill='tonexty',
-                       fillcolor='rgba(242,242,242,0.1)',                               # grey
+                       fillcolor='rgba(242,242,242,0.2)',                               # grey
                        connectgaps=True,
-                       line=dict(width=1.0, color='rgba(242,242,242,0.2)'),             # grey                  
+                       line=dict(width=1.0, color='rgba(242,242,242,0.0)'),             # grey                  
                        name='uncertainty',      
-                       showlegend=False,
+#                       showlegend=False,
 #                      hovertemplate='%{y:.2f}',
             )]         
 
@@ -408,7 +408,7 @@ def update_plot_timeseries(value):
                     y=0,
                     xref="x",
                     yref="y",
-                    text="No baseline anomaly",
+                    text="No anomaly timeseries",
                     showarrow=False,
                     font=dict(
                         family="Courier New, monospace",
@@ -417,7 +417,8 @@ def update_plot_timeseries(value):
                         ),                    
                 )
             ]
-        )    
+        )   
+         
     fig.update_layout(
         legend=dict(
             orientation='h',
@@ -468,7 +469,7 @@ def update_plot_differences(value):
                        mode='lines', 
                        fill='none',
                        connectgaps=True,
-                       line=dict(width=1.0, color='rgba(242,242,242,0.2)'),             # grey                  
+                       line=dict(width=1.0, color='rgba(242,242,242,0.0)'),             # grey                  
                        name='uncertainty',      
                        showlegend=False,
 #                      hovertemplate='%{y:.2f}',
@@ -476,11 +477,11 @@ def update_plot_differences(value):
             go.Scatter(x=t_monthly, y=-sd_monthly, 
                        mode='lines', 
                        fill='tonexty',
-                       fillcolor='rgba(242,242,242,0.1)',
+                       fillcolor='rgba(242,242,242,0.2)',
                        connectgaps=True,
-                       line=dict(width=1.0, color='rgba(242,242,242,0.2)'),             # grey                  
+                       line=dict(width=1.0, color='rgba(242,242,242,0.0)'),             # grey                  
                        name='uncertainty',      
-                       showlegend=False,
+#                       showlegend=False,
 #                      hovertemplate='%{y:.2f}',
             )]
 
@@ -519,7 +520,7 @@ def update_plot_differences(value):
                     y=0,
                     xref="x",
                     yref="y",
-                    text="No baseline anomaly",
+                    text="No differences",
                     showarrow=False,
                     font=dict(
                         family="Courier New, monospace",
@@ -620,7 +621,7 @@ def update_plot_changepoints(value):
                        mode='lines', 
                        fill='none',
                        connectgaps=True,
-                       line=dict(width=1.0, color='rgba(229, 176, 57, 0.2)'),           # mustard (colorsafe)                  
+                       line=dict(width=1.0, color='rgba(229, 176, 57, 0.0)'),           # mustard (colorsafe)                  
                        name='6 sigma',      
                        showlegend=False,
 #                      hovertemplate='%{y:.2f}',
@@ -628,11 +629,11 @@ def update_plot_changepoints(value):
         go.Scatter(x=x[mask], y=np.tile( np.abs(np.nanmean(y_fit_diff)) - 6.0*np.abs(np.nanstd(y_fit_diff)), len(x[mask]) ), 
                        mode='lines', 
                        fill='tonexty',
-                       fillcolor='rgba(229, 176, 57, 0.1)',
+                       fillcolor='rgba(229, 176, 57, 0.2)',
                        connectgaps=True,
                        line=dict(width=1.0, color='rgba(229, 176, 57, 0.2)'),           # mustard (colorsafe)       
-                       name='6 sigma',      
-                       showlegend=False,
+                       name='μ ± 6σ',      
+#                      showlegend=False,
 #                      hovertemplate='%{y:.2f}',                       
        )]
           	                                          
@@ -644,34 +645,7 @@ def update_plot_changepoints(value):
 #       template = None,
         xaxis = dict(range=[x[0],x[-1]]),       
         yaxis_title = {'text': 'CUSUM (O-E)'},
-        title = {'text': 'CHANGEPOINTS', 'x':0.1, 'y':0.95},      
-
-#	for j in range(len(breakpoints)):        
-#		    if (j%2 == 0) & (j<len(breakpoints)-1):
-#			plt.fill_betweenx(ylimits, breakpoints[j], breakpoints[j+1], facecolor='lightgrey', alpha=0.5, zorder=0)
-#		    elif (j%2 != 0) & (j<len(breakpoints)-1):        
-#			plt.fill_betweenx(ylimits, breakpoints[j], breakpoints[j+1], facecolor='grey', alpha=0.5, zorder=0)         
-#		    if j == 0:              
-#			plt.fill_betweenx(ylimits, x[mask][0], breakpoints[j], facecolor='grey', alpha=0.5, zorder=0)         
-#		    if (j == len(breakpoints)-1) & (j%2 == 0):              
-#			plt.fill_betweenx(ylimits, breakpoints[j], x[mask][-1], facecolor='lightgrey', alpha=0.5, zorder=0)         
-#		    if (j == len(breakpoints)-1) & (j%2 != 0):              
-#			plt.fill_betweenx(ylimits, breakpoints[j], x[mask][-1], facecolor='grey', alpha=0.5, zorder=0)      
-
- #       shapes=[
-#		dict(
-#		    type="rect",
-#		    xref="x",
-#		    yref="y",
-#		    x0=breakpoints[0],
-#		    y0="-50",
-#		    x1=breakpoints[1],
-#		    y1="150",
-#		    fillcolor="lightgray",
-#		    opacity=0.4,
-#		    line_width=0,
-#		    layer="below"
-#		)],                          
+        title = {'text': 'CHANGEPOINTS', 'x':0.1, 'y':0.95},                          
     )
 
     if mask.sum() == 0:
@@ -682,7 +656,7 @@ def update_plot_changepoints(value):
                     y=0,
                     xref="x",
                     yref="y",
-                    text="No baseline anomaly",
+                    text="No CUSUM data",
                     showarrow=False,
                     font=dict(
                         family="Courier New, monospace",
@@ -740,25 +714,42 @@ def update_plot_adjustments(value):
     	
     x = t_monthly[mask]
     y = np.cumsum( diff_monthly[mask] )
-
+    
     # CALL: cru_changepoint_detector
 
     y_fit, y_fit_diff, breakpoints, depth, r, R2adj = cru.changepoint_detector(x, y)
-    breakpoints_all = x[mask][ np.abs(y_fit_diff) >= np.abs(np.nanmean(y_fit_diff)) + 6.0*np.abs(np.nanstd(y_fit_diff)) ][0:]    
-    breakpoints_idx = np.arange(len(x[mask]))[ np.abs(y_fit_diff) >= np.abs(np.nanmean(y_fit_diff)) + 6.0*np.abs(np.nanstd(y_fit_diff)) ][0:]        
-       
-    # CALCULATE: intra-breakpoint fragment means
     
-    y_means = []
-    for j in range(len(breakpoints_all)+1):                
-        if j == 0:              
-            y_means = y_means + list( len( ts_monthly[mask][0:breakpoints_idx[0]] ) * [ -np.nanmean(ts_monthly[mask][0:breakpoints_idx[0]]) + np.nanmean(ex_monthly[mask][0:breakpoints_idx[0]]) ] ) 
-        if (j > 0) & (j<len(breakpoints_all)):
-            y_means = y_means + list( len( ts_monthly[mask][breakpoints_idx[j-1]:breakpoints_idx[j]] ) * [ -np.nanmean(ts_monthly[mask][breakpoints_idx[j-1]:breakpoints_idx[j]]) + np.nanmean(ex_monthly[mask][breakpoints_idx[j-1]:breakpoints_idx[j]]) ] ) 
-        if (j == len(breakpoints_all)):              
-            y_means = y_means + list( len( ts_monthly[mask][breakpoints_idx[-1]:] ) * [ -np.nanmean(ts_monthly[mask][breakpoints_idx[-1]:]) + np.nanmean(ex_monthly[mask][breakpoints_idx[-1]:]) ] ) 
+    print(len(breakpoints))
     
+    if len(breakpoints) == 0:
+    
+        mask = np.array(len(x)*[False])
+        data = []
+        trace_obs = [
+            go.Scatter(x=t_monthly, y=ts_monthly, 
+                mode='lines+markers', 
+                line=dict(width=1.0, color='rgba(20,115,175,0.0)'),                  # blue (colorsafe)
+                marker=dict(size=5, opacity=0.5, color='rgba(20,115,175,0.0)'),      # blue (colorsafe)
+                name='O',
+#               hovertemplate='%{y:.2f}',
+            )]       	
+        data = data + trace_obs
+            
     if mask.sum() > 0:
+
+        breakpoints_all = x[mask][ np.abs(y_fit_diff) >= np.abs(np.nanmean(y_fit_diff)) + 6.0*np.abs(np.nanstd(y_fit_diff)) ][0:]    
+        breakpoints_idx = np.arange(len(x[mask]))[ np.abs(y_fit_diff) >= np.abs(np.nanmean(y_fit_diff)) + 6.0*np.abs(np.nanstd(y_fit_diff)) ][0:]        
+       
+        # CALCULATE: intra-breakpoint fragment means
+    
+        y_means = []
+        for j in range(len(breakpoints_all)+1):                
+            if j == 0:              
+                y_means = y_means + list( len( ts_monthly[mask][0:breakpoints_idx[0]] ) * [ -np.nanmean(ts_monthly[mask][0:breakpoints_idx[0]]) + np.nanmean(ex_monthly[mask][0:breakpoints_idx[0]]) ] ) 
+            if (j > 0) & (j<len(breakpoints_all)):
+                y_means = y_means + list( len( ts_monthly[mask][breakpoints_idx[j-1]:breakpoints_idx[j]] ) * [ -np.nanmean(ts_monthly[mask][breakpoints_idx[j-1]:breakpoints_idx[j]]) + np.nanmean(ex_monthly[mask][breakpoints_idx[j-1]:breakpoints_idx[j]]) ] ) 
+            if (j == len(breakpoints_all)):              
+                y_means = y_means + list( len( ts_monthly[mask][breakpoints_idx[-1]:] ) * [ -np.nanmean(ts_monthly[mask][breakpoints_idx[-1]:]) + np.nanmean(ex_monthly[mask][breakpoints_idx[-1]:]) ] ) 
 
         data = []
                          
@@ -767,7 +758,7 @@ def update_plot_adjustments(value):
                        mode='lines', 
                        fill='none',
                        connectgaps=True,
-                       line=dict(width=1.0, color='rgba(242,242,242,0.2)'),             # grey                  
+                       line=dict(width=1.0, color='rgba(242,242,242,0.0)'),             # grey                  
                        name='uncertainty',      
                        showlegend=False,
 #                      hovertemplate='%{y:.2f}',
@@ -775,12 +766,11 @@ def update_plot_adjustments(value):
             go.Scatter(x=t_monthly[mask], y=ex_monthly[mask]-sd_monthly[mask], 
                        mode='lines', 
                        fill='tonexty',
-                       fillcolor='rgba(242,242,242,0.1)',                               # grey
+                       fillcolor='rgba(242,242,242,0.2)',                               # grey
                        connectgaps=True,
-                       line=dict(width=1.0, color='rgba(242,242,242,0.2)'),             # grey                  
-
+                       line=dict(width=1.0, color='rgba(242,242,242,0.0)'),             # grey                  
                        name='uncertainty',      
-                       showlegend=False,
+#                       showlegend=True,
 #                      hovertemplate='%{y:.2f}',
             )]   
             	
@@ -817,7 +807,7 @@ def update_plot_adjustments(value):
             go.Scatter(x=x[mask], y=y_means, 
                     mode='lines+markers', 
                     line=dict(width=1.0, color='rgba(229, 176, 57, 1.0)'),                 # mustard (colorsafe)
-                    marker=dict(size=2, opacity=0.5, color='rgba(229, 176, 57, 1.0)'),     # mustard (colorsafe)
+                    marker=dict(size=3, opacity=0.5, color='rgba(229, 176, 57, 1.0)'),     # mustard (colorsafe)
                     name='adjustment',                
     #               hovertemplate='%{y:.2f}', 
             )]
@@ -830,45 +820,18 @@ def update_plot_adjustments(value):
 #       template = None,
         xaxis = dict(range=[x[0],x[-1]]),       
         yaxis_title = {'text': 'Anomaly (from 1961-1990), °C'},
-        title = {'text': 'ADJUSTMENTS (E-O)', 'x':0.1, 'y':0.95},      
-
-#	for j in range(len(breakpoints)):        
-#		    if (j%2 == 0) & (j<len(breakpoints)-1):
-#			plt.fill_betweenx(ylimits, breakpoints[j], breakpoints[j+1], facecolor='lightgrey', alpha=0.5, zorder=0)
-#		    elif (j%2 != 0) & (j<len(breakpoints)-1):        
-#			plt.fill_betweenx(ylimits, breakpoints[j], breakpoints[j+1], facecolor='grey', alpha=0.5, zorder=0)         
-#		    if j == 0:              
-#			plt.fill_betweenx(ylimits, x[mask][0], breakpoints[j], facecolor='grey', alpha=0.5, zorder=0)         
-#		    if (j == len(breakpoints)-1) & (j%2 == 0):              
-#			plt.fill_betweenx(ylimits, breakpoints[j], x[mask][-1], facecolor='lightgrey', alpha=0.5, zorder=0)         
-#		    if (j == len(breakpoints)-1) & (j%2 != 0):              
-#			plt.fill_betweenx(ylimits, breakpoints[j], x[mask][-1], facecolor='grey', alpha=0.5, zorder=0)      
-
- #       shapes=[
-#		dict(
-#		    type="rect",
-#		    xref="x",
-#		    yref="y",
-#		    x0=breakpoints[0],
-#		    y0="-50",
-#		    x1=breakpoints[1],
-#		    y1="150",
-#		    fillcolor="lightgray",
-#		    opacity=0.4,
-#		    line_width=0,
-#		    layer="below"
-#		)],                          
+        title = {'text': 'ADJUSTMENTS (E-O)', 'x':0.1, 'y':0.95},                           
     )
 
     if mask.sum() == 0:
         fig.update_layout(
             annotations=[
                 dict(
-                    x=t_yearly[np.floor(len(t_monthly)/2).astype(int)],
+                    x=t_monthly[np.floor(len(t_monthly)/2).astype('int')],
                     y=0,
                     xref="x",
                     yref="y",
-                    text="No baseline anomaly",
+                    text="No adjustments",
                     showarrow=False,
                     font=dict(
                         family="Courier New, monospace",
@@ -901,19 +864,6 @@ def update_plot_seasonal(value):
     """
     Plot seasonal local expectations
     """
-
-#    da = df_temp[df_temp['stationcode']==df_temp['stationcode'].unique()[value]].iloc[:,range(0,13)]
-
-#    # TRIM: to 1678 to work-around Pandas datetime limit
-
-#    da = da[da.year >= 1678].reset_index(drop=True)
-
-#    ts_monthly = []    
-#    for i in range(len(da)):            
-#        monthly = da.iloc[i,1:]
-#        ts_monthly = ts_monthly + monthly.to_list()    
-#    ts_monthly = np.array(ts_monthly)   
-#    t_monthly = pd.date_range(start=str(da.year.iloc[0]), periods=len(ts_monthly), freq='MS')    
 
     df = df_temp[ df_temp['stationcode'] == df_temp['stationcode'].unique()[value] ].sort_values(by='year').reset_index(drop=True).dropna()
     dt = df.groupby('year').mean().iloc[:,0:12]
@@ -1012,7 +962,7 @@ def update_plot_seasonal(value):
                     y=0,
                     xref="x",
                     yref="y",
-                    text="No baseline anomaly",
+                    text="No seasonal extracts",
                     showarrow=False,
                     font=dict(
                         family="Courier New, monospace",
