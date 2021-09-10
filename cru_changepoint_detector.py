@@ -9,8 +9,8 @@ def changepoint_detector(x,y):
     ------------------------------------------------------------------------------
     PROGRAM: cru_changepoint_detector.py
     ------------------------------------------------------------------------------
-    Version 0.1
-    24 August, 2021
+    Version 0.2
+    10 September, 2021
     Michael Taylor
     https://patternizer.github.io
     patternizer AT gmail DOT com
@@ -49,10 +49,11 @@ def changepoint_detector(x,y):
     # SETTINGS (pre-optimised for monthly timeseries)
     #--------------------------------------------------------------------------
 
-    min_samples_leaf = 100
-    max_bins = 24
+    min_samples_leaf = 24
+    max_bins = 60
     max_depth = 12 # in range [1,20]
-    max_r_over_rmax = 0.995 
+    max_r_over_rmax = 0.999 
+    use_slope = False
 
     # FORMAT: mask and reshape data
 
@@ -97,7 +98,33 @@ def changepoint_detector(x,y):
     ).fit(x_obs, y_obs)    
     y_fit = lt.predict(x_obs)            
     y_fit_diff = [0.0] + list(np.diff(y_fit))        
-    breakpoints = x[mask][ np.abs(y_fit_diff) >= np.abs(np.nanmean(y_fit_diff)) + 6.0*np.abs(np.nanstd(y_fit_diff)) ][0:]
+
+    # BREAKPOINT: detection ( using change in slope > 0.5 )
+    
+    breakpoints_all = x[mask][ np.abs(y_fit_diff) >= np.abs(np.nanmean(y_fit_diff)) + 6.0*np.abs(np.nanstd(y_fit_diff)) ][0:]
+    breakpoints_idx = np.arange(len(x[mask]))[ np.abs(y_fit_diff) >= np.abs(np.nanmean(y_fit_diff)) + 6.0*np.abs(np.nanstd(y_fit_diff)) ][0:]        
+    
+    if use_slope == True:
+    
+        slopes = []
+        for j in range(len(breakpoints_all)+1):
+            if j == 0:            
+                xj = x[ 0:breakpoints_idx[0] ]
+                yj = y[ 0:breakpoints_idx[0] ]
+            elif j == len(breakpoints_all):                   
+                xj = x[ breakpoints_idx[-1]: ] 
+                yj = y[ breakpoints_idx[-1]: ]
+            elif (j>0) & (j<(len(breakpoints_all))):               
+                xj = x[ breakpoints_idx[j-1]:breakpoints_idx[j] ]
+                yj = y[ breakpoints_idx[j-1]:breakpoints_idx[j] ]
+            t, ypred, slope, intercept = linear_regression_ols(xj,yj)
+            slopes.append(slope)     
+        dslopes = np.diff(slopes)
+        breakpoints = breakpoints_all[ (np.abs(dslopes) > 0.5) ]
+        
+    else:
+        
+        breakpoints = breakpoints_all
 
     return y_fit, y_fit_diff, breakpoints, depth, r, R2adj    
 #------------------------------------------------------------------------------
