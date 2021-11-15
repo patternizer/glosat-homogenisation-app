@@ -1,8 +1,8 @@
 #------------------------------------------------------------------------------
 # PROGRAM: glosat.py
 #------------------------------------------------------------------------------
-# Version 0.15
-# 5 September, 2021
+# Version 0.16
+# 15 November, 2021
 # Michael Taylor
 # https://patternizer.github.io
 # michael DOT a DOT taylor AT uea DOT ac DOT uk
@@ -190,18 +190,18 @@ layout = html.Div([
             ),           
         ]),
 
-#        dbc.Row([
-#            dbc.Col(html.Div([
-#                dcc.Graph(id="plot-worldmap", style = {'padding' : '10px', 'width': '100%', 'display': 'inline-block'}),                                    
-#            ]), 
-#            width={'size':6}, 
-#            ),           
-#            dbc.Col(html.Div([
-#                dcc.Graph(id="plot-seasonal", style = {'padding' : '10px', 'width': '100%', 'display': 'inline-block'}),                                    
-#            ]), 
-#            width={'size':6}, 
-#            ),           
-#        ]),
+        dbc.Row([
+            dbc.Col(html.Div([
+                dcc.Graph(id="plot-worldmap", style = {'padding' : '10px', 'width': '100%', 'display': 'inline-block'}),                                    
+            ]), 
+            width={'size':6}, 
+            ),           
+            dbc.Col(html.Div([
+                dcc.Graph(id="plot-seasonal", style = {'padding' : '10px', 'width': '100%', 'display': 'inline-block'}),                                    
+            ]), 
+            width={'size':6}, 
+            ),           
+        ]),
         
         dbc.Row([
             dbc.Col(html.Div([     
@@ -214,7 +214,12 @@ layout = html.Div([
             ],
             style = {'padding' : '10px', 'width': '100%', 'display': 'inline-block'}),    
             width={'size':6}, 
-            ),
+            ),                        
+            dbc.Col( html.Div([
+                dcc.Graph(id="breakpoints", style = {'padding' : '10px', 'width': '100%', 'display': 'inline-block'}), 
+            ]), 
+            width={'size':6}, 
+            ),     
         ]),
             
     ]),
@@ -495,8 +500,8 @@ def update_plot_differences(value):
 #                line=dict(width=1.0, color='rgba(137, 195, 239, 1.0)'),                # lightblue (colorsafe)                               
 #                line=dict(width=1.0, color='rgba(229, 176, 57, 1.0)'),                 # mustard (colorsafe)
 
-                line=dict(width=1.0, color='rgba(229, 176, 57, 1.0)'),                  # mustard (colorsafe)
-                marker=dict(size=5, opacity=0.5, color='rgba(229, 176, 57, 1.0)'),      # mustard (colorsafe)
+                line=dict(width=1.0, color='rgba(137, 195, 239, 1.0)'),                 # lightblue (colorsafe)   
+                marker=dict(size=5, opacity=0.5, color='rgba(137, 195, 239, 1.0)'),     # lightblue (colorsafe)   
                 name='O-E',
 #               hovertemplate='%{y:.2f}',
             )]   
@@ -579,7 +584,9 @@ def update_plot_changepoints(value):
 
     # CALL: cru_changepoint_detector
 
-    y_fit, y_fit_diff, breakpoints, depth, r, R2adj = cru.changepoint_detector(x, y)
+#    y_fit, y_fit_diff, breakpoints, depth, r, R2adj = cru.changepoint_detector(x, y)
+    y_fit, y_fit_diff, y_fit_diff2, slopes, breakpoints, depth, r, R2adj = cru.changepoint_detector(x, y)
+
 
     print('BE WATER MY FRIEND')
 
@@ -612,7 +619,6 @@ def update_plot_changepoints(value):
                 line=dict(width=1.0, color='rgba(229, 176, 57, 1.0)'),                 # mustard (colorsafe)
                 marker=dict(size=2, opacity=0.5, color='rgba(229, 176, 57, 1.0)'),     # mustard (colorsafe)
                 name='d(LTR)',                
-#               hovertemplate='%{y:.2f}', 
         )]
         
     trace_6_sigma = [                    
@@ -624,7 +630,6 @@ def update_plot_changepoints(value):
                        line=dict(width=1.0, color='rgba(229, 176, 57, 0.0)'),           # mustard (colorsafe)                  
                        name='6 sigma',      
                        showlegend=False,
-#                      hovertemplate='%{y:.2f}',
         ),           
         go.Scatter(x=x[mask], y=np.tile( np.abs(np.nanmean(y_fit_diff)) - 6.0*np.abs(np.nanstd(y_fit_diff)), len(x[mask]) ), 
                        mode='lines', 
@@ -632,12 +637,22 @@ def update_plot_changepoints(value):
                        fillcolor='rgba(229, 176, 57, 0.2)',
                        connectgaps=True,
                        line=dict(width=1.0, color='rgba(229, 176, 57, 0.2)'),           # mustard (colorsafe)       
-                       name='μ ± 6σ',      
-#                      showlegend=False,
-#                      hovertemplate='%{y:.2f}',                       
+                       name='μ ± 6σ',                       
        )]
-          	                                          
-    data = data + trace_ltr_cumsum + trace_ltr + trace_ltr_diff + trace_6_sigma
+
+    trace_slopes = [
+                    
+        go.Scatter(x=x[mask], y=slopes[mask], 
+                mode='lines', 
+                fill='tozeroy',
+                fillcolor='rgba(137, 195, 239, 0.2)',                      # lightblue (colorsafe)
+                line=dict(width=1.0, color='rgba(137, 195, 239, 0.2)'),    # lightblue (colorsafe)
+                connectgaps=True,
+                name='CUSUM / decade',                
+        )]
+                                            	                                          
+#    data = data + trace_ltr_cumsum + trace_ltr + trace_ltr_diff + trace_6_sigma
+    data = data + trace_ltr_cumsum + trace_ltr + trace_slopes
                                      
     fig = go.Figure(data)
     fig.update_layout(
@@ -666,6 +681,18 @@ def update_plot_changepoints(value):
                 )
             ]
         )    
+
+    for k in range(len(breakpoints)):
+    
+        print(x[mask][breakpoints[k]])    	
+        fig.add_shape(type='line',
+            yref="y",
+            xref="x",
+            x0=x[mask][breakpoints[k]],
+            y0=np.min([slopes[mask].min(),y[mask].min(),y_fit[mask].min()]),
+            x1=x[mask][breakpoints[k]],
+            y1=np.max([slopes[mask].max(),y[mask].max(),y_fit[mask].max()]),
+            line=dict(color='rgba(229, 176, 57, 1)', width=1, dash='dot'))
     
     fig.update_layout(
         legend=dict(
@@ -717,10 +744,9 @@ def update_plot_adjustments(value):
     
     # CALL: cru_changepoint_detector
 
-    y_fit, y_fit_diff, breakpoints, depth, r, R2adj = cru.changepoint_detector(x, y)
-    
-    print(len(breakpoints))
-    
+    #y_fit, y_fit_diff, breakpoints, depth, r, R2adj = cru.changepoint_detector(x, y)
+    y_fit, y_fit_diff, y_fit_diff2, slopes, breakpoints, depth, r, R2adj = cru.changepoint_detector(x, y)
+       
     if len(breakpoints) == 0:
     
         mask = np.array(len(x)*[False])
@@ -737,8 +763,10 @@ def update_plot_adjustments(value):
             
     if mask.sum() > 0:
 
-        breakpoints_all = x[mask][ np.abs(y_fit_diff) >= np.abs(np.nanmean(y_fit_diff)) + 6.0*np.abs(np.nanstd(y_fit_diff)) ][0:]    
-        breakpoints_idx = np.arange(len(x[mask]))[ np.abs(y_fit_diff) >= np.abs(np.nanmean(y_fit_diff)) + 6.0*np.abs(np.nanstd(y_fit_diff)) ][0:]        
+#        breakpoints_all = x[mask][ np.abs(y_fit_diff) >= np.abs(np.nanmean(y_fit_diff)) + 6.0*np.abs(np.nanstd(y_fit_diff)) ][0:]    
+#        breakpoints_idx = np.arange(len(x[mask]))[ np.abs(y_fit_diff) >= np.abs(np.nanmean(y_fit_diff)) + 6.0*np.abs(np.nanstd(y_fit_diff)) ][0:]        
+        breakpoints_all = breakpoints
+        breakpoints_idx = breakpoints
        
         # CALCULATE: intra-breakpoint fragment means
     
@@ -820,7 +848,7 @@ def update_plot_adjustments(value):
 #       template = None,
         xaxis = dict(range=[x[0],x[-1]]),       
         yaxis_title = {'text': 'Anomaly (from 1961-1990), °C'},
-        title = {'text': 'ADJUSTMENTS (E-O)', 'x':0.1, 'y':0.95},                           
+        title = {'text': 'ADJUSTMENTS', 'x':0.1, 'y':0.95},                           
     )
 
     if mask.sum() == 0:
@@ -841,6 +869,18 @@ def update_plot_adjustments(value):
                 )
             ]
         )    
+
+    for k in range(len(breakpoints)):
+    
+        print(x[mask][breakpoints[k]])    	
+        fig.add_shape(type='line',
+            yref="y",
+            xref="x",
+            x0=t_monthly[mask][breakpoints[k]],
+            y0=np.min([ts_monthly[mask].min(),ex_monthly[mask].min(), np.array(ex_monthly[mask]-sd_monthly[mask]).min() ]),
+            x1=t_monthly[mask][breakpoints[k]],
+            y1=np.max([ts_monthly[mask].max(),ex_monthly[mask].max(), np.array(ex_monthly[mask]+sd_monthly[mask]).max() ]),
+            line=dict(color='rgba(229, 176, 57, 1)', width=1, dash='dot'))
     
     fig.update_layout(
         legend=dict(
@@ -881,13 +921,13 @@ def update_plot_seasonal(value):
     ts_monthly = np.array( da.groupby('year').mean().iloc[:,0:12]).ravel()    
     ex_monthly = np.array( de.groupby('year').mean().iloc[:,0:12]).ravel()    
     sd_monthly = np.array( sd.groupby('year').mean().iloc[:,0:12]).ravel()                   
-    ts_monthly = np.array( moving_average( ts_monthly, nsmooth ) )    
-    ex_monthly = np.array( moving_average( ex_monthly, nsmooth ) )    
-    sd_monthly = np.array( moving_average( sd_monthly, nsmooth ) )    
+#    ts_monthly = np.array( moving_average( ts_monthly, nsmooth ) )    
+#    ex_monthly = np.array( moving_average( ex_monthly, nsmooth ) )    
+#    sd_monthly = np.array( moving_average( sd_monthly, nsmooth ) )    
 
-    trim_months = len(ts_monthly)%12
+    trim_months = len(ex_monthly)%12
  
-    t_monthly = pd.date_range(start=str(da.year.iloc[0]), periods=len(ts_monthly), freq='MS')    
+    t_monthly = pd.date_range(start=str(da.year.iloc[0]), periods=len(ex_monthly), freq='MS')    
     df = pd.DataFrame({'Tg':ex_monthly[:-1-trim_months]}, index=t_monthly[:-1-trim_months])     
     
     t = [ pd.to_datetime( str(df.index.year.unique()[i])+'-01-01') for i in range(len(df.index.year.unique())) ][1:] # years
@@ -895,6 +935,8 @@ def update_plot_seasonal(value):
     MAM = ( df[df.index.month==3]['Tg'].values[1:] + df[df.index.month==4]['Tg'].values[1:] + df[df.index.month==5]['Tg'].values[1:] ) / 3
     JJA = ( df[df.index.month==6]['Tg'].values[1:] + df[df.index.month==7]['Tg'].values[1:] + df[df.index.month==8]['Tg'].values[1:] ) / 3
     SON = ( df[df.index.month==9]['Tg'].values[1:] + df[df.index.month==10]['Tg'].values[1:] + df[df.index.month==11]['Tg'].values[1:] ) / 3
+    
+    
     df_seasonal = pd.DataFrame({'DJF':DJF, 'MAM':MAM, 'JJA':JJA, 'SON':SON}, index = t)
           
     df_seasonal_ma = df_seasonal.rolling(10, center=True).mean() # decadal smoothing
@@ -914,34 +956,40 @@ def update_plot_seasonal(value):
             go.Scatter(                                  
                 x=df_seasonal_fft.index[mask['DJF']], y=df_seasonal_fft['DJF'][mask['DJF']], 
                 mode='lines+markers', 
-                line=dict(width=3, color='black'),
-                marker=dict(size=7, symbol='square', opacity=1.0, color='blue', line_width=1, line_color='black'),                       
+                line=dict(width=1, color='rgba(20,115,175,0.5)'),
+                marker=dict(size=7, symbol='square', opacity=0.5, color='rgba(20,115,175,0.5)', line_width=1, line_color='rgba(20,115,175,0.5)'),                       
                 name='DJF')
     ]
     trace_spring=[
             go.Scatter(                                  
                 x=df_seasonal_fft.index[mask['MAM']], y=df_seasonal_fft['MAM'][mask['MAM']], 
                 mode='lines+markers', 
-                line=dict(width=3, color='black'),
-                marker=dict(size=7, symbol='square', opacity=1.0, color='red', line_width=1, line_color='black'),       
+                line=dict(width=1, color='rgba(137, 195, 239, 0.5)'),
+                marker=dict(size=7, symbol='square', opacity=0.5, color='rgba(137, 195, 239, 0.5)', line_width=1, line_color='rgba(137, 195, 239, 1.0)'),       
                 name='MAM')
     ]
     trace_summer=[
             go.Scatter(                                  
                 x=df_seasonal_fft.index[mask['JJA']], y=df_seasonal_fft['JJA'][mask['JJA']], 
                 mode='lines+markers', 
-                line=dict(width=3, color='black'),
-                marker=dict(size=7, symbol='square', opacity=1.0, color='purple', line_width=1, line_color='black'),       
+                line=dict(width=1, color='rgba(234, 89, 78, 0.5)'),
+                marker=dict(size=7, symbol='square', opacity=0.5, color='rgba(234, 89, 78, 0.5)', line_width=1, line_color='rgba(234, 89, 78, 0.5)'),       
                 name='JJA')
     ]
     trace_autumn=[
             go.Scatter(                                  
                 x=df_seasonal_fft.index[mask['SON']], y=df_seasonal_fft['SON'][mask['SON']], 
                 mode='lines+markers', 
-                line=dict(width=3, color='black'),
-                marker=dict(size=7, symbol='square', opacity=1.0, color='green', line_width=1, line_color='black'),       
+                line=dict(width=1, color='rgba(229, 176, 57, 0.5)'),
+                marker=dict(size=7, symbol='square', opacity=0.5, color='rgba(229, 176, 57, 0.5)', line_width=1, line_color='rgba(229, 176, 57, 0.5)'),       
                 name='SON')
     ]
+
+#                line=dict(width=1.0, color='rgba(234, 89, 78, 1.0)'),                  # red (colorsafe)                      
+#                line=dict(width=1.0, color='rgba(20,115,175,1.0)'),                    # blue (colorsafe)
+#                line=dict(width=1.0, color='rgba(137, 195, 239, 1.0)'),                # lightblue (colorsafe)                               
+#                line=dict(width=1.0, color='rgba(229, 176, 57, 1.0)'),                 # mustard (colorsafe)
+    
     data = data + trace_winter + trace_spring + trace_summer + trace_autumn
                                           
     fig = go.Figure(data)
@@ -982,6 +1030,74 @@ def update_plot_seasonal(value):
     fig.update_layout(height=400, width=550, margin={"r":10,"t":50,"l":70,"b":50})    
 
     return fig
+
+@app.callback(
+    Output(component_id='breakpoints', component_property='figure'),
+    [Input(component_id='station', component_property='value')],    
+    )
+    
+def update_breakpoints(value):
+    
+    """
+    Display breakpoints
+    """
+
+    df = df_temp[ df_temp['stationcode'] == df_temp['stationcode'].unique()[value] ].sort_values(by='year').reset_index(drop=True).dropna()
+    dt = df.groupby('year').mean().iloc[:,0:12]
+    dn_array = np.array( df.groupby('year').mean().iloc[:,19:31] )
+    dn = dt.copy()
+    dn.iloc[:,0:] = dn_array
+    da = (dt - dn).reset_index()
+    de = (df.groupby('year').mean().iloc[:,31:43]).reset_index()
+    sd = (df.groupby('year').mean().iloc[:,43:55]).reset_index()        
+    ts_monthly = np.array( da.groupby('year').mean().iloc[:,0:12]).ravel()    
+    ex_monthly = np.array( de.groupby('year').mean().iloc[:,0:12]).ravel()    
+    sd_monthly = np.array( sd.groupby('year').mean().iloc[:,0:12]).ravel()                   
+    dn_monthly = np.array( dn.groupby('year').mean().iloc[:,0:12]).ravel()                   
+    ts_monthly = np.array( moving_average( ts_monthly, nsmooth ) )    
+    ex_monthly = np.array( moving_average( ex_monthly, nsmooth ) )    
+    sd_monthly = np.array( moving_average( sd_monthly, nsmooth ) )    
+    diff_monthly = ts_monthly - ex_monthly
+    # Solve Y1677-Y2262 Pandas bug with Xarray:        
+    t_monthly = xr.cftime_range(start=str(da['year'].iloc[0]), periods=len(ts_monthly), freq='M', calendar='noleap')     
+    mask = np.isfinite(ex_monthly) & np.isfinite(ts_monthly)    
+         
+    # CALCULATE: CUSUM
+    	
+    x = t_monthly[mask]
+    y = np.cumsum( diff_monthly[mask] )
+    
+    # CALL: cru_changepoint_detector
+
+    #y_fit, y_fit_diff, breakpoints, depth, r, R2adj = cru.changepoint_detector(x, y)
+    y_fit, y_fit_diff, y_fit_diff2, slopes, breakpoints, depth, r, R2adj = cru.changepoint_detector(x, y)
+       
+    if len(breakpoints) == 0:
+        print('no breakpoints')
+                                              
+    data = [
+        go.Table(
+            header=dict(values=['Breakpoint number', 'Date'],
+                line_color='darkslategray',
+                fill_color='lightgrey',
+                font = dict(color='Black'),
+                align='left'),
+            cells=dict(values=[
+                np.arange(1,len(breakpoints)+1),t_monthly[breakpoints]
+                ],
+                line_color='slategray',
+                fill_color='black',
+                font = dict(color='white'),
+                align='left')
+        ),
+    ]
+    
+    layout = go.Layout(
+       template = "plotly_dark", 
+#      template = None,
+       height=130, width=550, margin=dict(r=10, l=10, b=10, t=10))
+
+    return {'data': data, 'layout':layout} 
 
 ##################################################################################################
 # Run the dash app
