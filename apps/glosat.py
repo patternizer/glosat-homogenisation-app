@@ -1095,7 +1095,7 @@ def update_breakpoints(value):
     layout = go.Layout(
        template = "plotly_dark", 
 #      template = None,
-       height=130, width=550, margin=dict(r=10, l=10, b=10, t=10))
+       height=400, width=550, margin=dict(r=10, l=10, b=10, t=10))
 
     return {'data': data, 'layout':layout} 
 
