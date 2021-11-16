@@ -1,8 +1,8 @@
 #------------------------------------------------------------------------------
 # PROGRAM: glosat.py
 #------------------------------------------------------------------------------
-# Version 0.16
-# 15 November, 2021
+# Version 0.17
+# 16 November, 2021
 # Michael Taylor
 # https://patternizer.github.io
 # michael DOT a DOT taylor AT uea DOT ac DOT uk
@@ -60,31 +60,7 @@ fontsize = 12
 nsmooth = 12                  # 1yr MA monthly
 nfft = 10                     # decadal smoothing
 
-df_temp = pd.read_pickle('df_temp_expect.pkl', compression='bz2')
-
-reduce_precision = False
-if reduce_precision == True:
-
-    # PRECISION: --> int16 and float16
-        
-    for i in range(1,13):                 
-        df_temp[str(i)] = df_temp[str(i)].astype('float16')
-        df_temp['n'+str(i)] = df_temp['n'+str(i)].astype('float16')
-        df_temp['e'+str(i)] = df_temp['e'+str(i)].astype('float16')
-        df_temp['s'+str(i)] = df_temp['s'+str(i)].astype('float16')
-    df_temp['stationlat'] = df_temp['stationlat'].astype('float16')
-    df_temp['stationlon'] = df_temp['stationlon'].astype('float16')
-    df_temp['stationelevation'] = df_temp['stationelevation'].astype('float16')
-    df_temp['year'] = df_temp['year'].astype('int16')
-    #df_temp['stationfirstyear'] = df_temp['stationfirstyear'].astype('int16')          # --> fails due to NaN being float
-    #df_temp['stationlastyear'] = df_temp['stationlastyear'].astype('int16')            # --> fails due to NaN being float
-    #df_temp['stationfirstreliable'] = df_temp['stationfirstreliable'].astype('int16')  # --> fails due to NaN being float
-    #df_temp['stationsource'] = df_temp['stationsource'].astype('int16')                # --> fails due to NaN being float
-    del df_temp['stationfirstyear']
-    del df_temp['stationlastyear']
-    del df_temp['stationfirstreliable']
-    del df_temp['stationsource']
-#    df_temp.to_pickle( "df_temp_expect.pkl", compression="bz2" )
+df_temp = pd.read_pickle('df_temp_expect_reduced.pkl', compression='bz2')
 
 # GENERATE: station code:name list
 
@@ -93,6 +69,10 @@ stationcodestr = gb['stationcode']
 stationnamestr = [ gb['stationname'][i][0] for i in range(len(stationcodestr)) ]
 stationstr = stationcodestr + ': ' + stationnamestr
 opts = [{'label' : stationstr[i], 'value' : i} for i in range(len(stationstr))]
+
+#==============================================================================
+value = np.where(df_temp['stationcode'].unique()=='619930')[0][0] # Pamplemousses
+#==============================================================================
 
 #----------------------------------------------------------------------------------
 # METHODS
@@ -260,8 +240,6 @@ def update_station_info(value):
                     [station], 
                     [country], 
                 ],
-#               line_color='darkslategray',
-#               fill_color='white',
                 line_color='slategray',
                 fill_color='black',
                 font = dict(color='white'),
@@ -270,7 +248,6 @@ def update_station_info(value):
     ]
     layout = go.Layout(
        template = "plotly_dark", 
-#      template = None,
        height=130, width=550, margin=dict(r=10, l=10, b=10, t=10))
 
     return {'data': data, 'layout':layout} 
@@ -334,64 +311,88 @@ def update_plot_timeseries(value):
     Plot station timeseries
     """
 
-    df = df_temp[ df_temp['stationcode'] == df_temp['stationcode'].unique()[value] ].sort_values(by='year').reset_index(drop=True).dropna()
+    df_compressed = df_temp[ df_temp['stationcode'] == df_temp['stationcode'].unique()[value] ].sort_values(by='year').reset_index(drop=True).dropna()    
+    t_yearly = np.arange( df_compressed.iloc[0].year, df_compressed.iloc[-1].year + 1)
+    df_yearly = pd.DataFrame({'year':t_yearly})
+    df = df_yearly.merge(df_compressed, how='left', on='year')
     dt = df.groupby('year').mean().iloc[:,0:12]
     dn_array = np.array( df.groupby('year').mean().iloc[:,19:31] )
     dn = dt.copy()
     dn.iloc[:,0:] = dn_array
     da = (dt - dn).reset_index()
     de = (df.groupby('year').mean().iloc[:,31:43]).reset_index()
-    sd = (df.groupby('year').mean().iloc[:,43:55]).reset_index()        
-    ts_monthly = np.array( da.groupby('year').mean().iloc[:,0:12]).ravel()    
-    ex_monthly = np.array( de.groupby('year').mean().iloc[:,0:12]).ravel()    
-    sd_monthly = np.array( sd.groupby('year').mean().iloc[:,0:12]).ravel()                   
-    ts_monthly = np.array( moving_average( ts_monthly, nsmooth ) )    
-    ex_monthly = np.array( moving_average( ex_monthly, nsmooth ) )    
-    sd_monthly = np.array( moving_average( sd_monthly, nsmooth ) )    
+    ds = (df.groupby('year').mean().iloc[:,43:55]).reset_index()  
+    
+    # TRIM: to start of Pandas datetime range
+        
+    da = da[da.year >= 1678].reset_index(drop=True)
+    de = de[de.year >= 1678].reset_index(drop=True)
+    ds = ds[ds.year >= 1678].reset_index(drop=True)
+          
+    ts_monthly = np.array( da.groupby('year').mean().iloc[:,0:12]).ravel().astype(float)
+    ex_monthly = np.array( de.groupby('year').mean().iloc[:,0:12]).ravel().astype(float)    
+    sd_monthly = np.array( ds.groupby('year').mean().iloc[:,0:12]).ravel().astype(float)           
+
     # Solve Y1677-Y2262 Pandas bug with Xarray:        
-    t_monthly = xr.cftime_range(start=str(da['year'].iloc[0]), periods=len(ts_monthly), freq='M', calendar='noleap')     
-    mask = np.isfinite(ex_monthly)
+#   t_monthly = xr.cftime_range(start=str(da['year'].iloc[0]), periods=len(ts_monthly), freq='M', calendar='noleap')      
+    t_monthly = pd.date_range(start=str(da['year'].iloc[0]), periods=len(ts_monthly), freq='M')     
+    mask = np.array(len(ts_monthly) * [True])
+
+    # COMPUTE: 12-m MA
+    
+    a = pd.Series(ts_monthly).rolling(12, center=True).mean().values
+    e = pd.Series(ex_monthly).rolling(12, center=True).mean().values
+    s = pd.Series(sd_monthly).rolling(12, center=True).mean().values
+
+    t = t_monthly[mask]
+    a = a[mask]
+    e = e[mask]
+    s = s[mask]
+
+    diff_yearly = a - e
+    
+    # CALCULATE: CUSUM
+        	
+    c = np.nancumsum( diff_yearly )
+    x = ( np.arange(len(c)) / len(c) )
+    y = c    
+        
     if mask.sum() > 0:
 
         data = []
         
         trace_error = [
-            go.Scatter(x=t_monthly[mask], y=ex_monthly[mask]+sd_monthly[mask], 
+            go.Scatter(x=t, y=e+s, 
                        mode='lines', 
                        fill='none',
                        connectgaps=True,
                        line=dict(width=1.0, color='rgba(242,242,242,0.0)'),             # grey                  
                        name='uncertainty',      
                        showlegend=False,
-#                      hovertemplate='%{y:.2f}',
             ),
-            go.Scatter(x=t_monthly[mask], y=ex_monthly[mask]-sd_monthly[mask], 
+            go.Scatter(x=t, y=e-s, 
                        mode='lines', 
                        fill='tonexty',
                        fillcolor='rgba(242,242,242,0.2)',                               # grey
                        connectgaps=True,
                        line=dict(width=1.0, color='rgba(242,242,242,0.0)'),             # grey                  
                        name='uncertainty',      
-#                       showlegend=False,
-#                      hovertemplate='%{y:.2f}',
             )]         
 
         trace_expect = [            
-            go.Scatter(x=t_monthly, y=ex_monthly, 
+            go.Scatter(x=t, y=e, 
                 mode='lines+markers', 
                 line=dict(width=1.0, color='rgba(234, 89, 78, 1.0)'),                 # red (colorsafe)
                 marker=dict(size=5, opacity=0.5, color='rgba(234, 89, 78, 1.0)'),     # red (colorsafe)
                 name='E',
-#               hovertemplate='%{y:.2f}',
             )]
 
         trace_obs = [
-            go.Scatter(x=t_monthly, y=ts_monthly, 
+            go.Scatter(x=t, y=a, 
                 mode='lines+markers', 
                 line=dict(width=1.0, color='rgba(20,115,175,1.0)'),                  # blue (colorsafe)
                 marker=dict(size=5, opacity=0.5, color='rgba(20,115,175,1.0)'),      # blue (colorsafe)
                 name='O',
-#               hovertemplate='%{y:.2f}',
             )]   
 
     data = data + trace_error + trace_expect + trace_obs
@@ -400,7 +401,7 @@ def update_plot_timeseries(value):
     fig.update_layout(
         template = "plotly_dark",
 #       template = None,
-        xaxis = dict(range=[t_monthly[0],t_monthly[-1]]),       
+        xaxis = dict(range=[t[0],t[-1]]),       
         yaxis_title = {'text': 'Anomaly (from 1961-1990), °C'},
         title = {'text': 'OBSERVATIONS (O) Vs LOCAL EXPECTATION (E)', 'x':0.1, 'y':0.95},                
     )
@@ -409,7 +410,7 @@ def update_plot_timeseries(value):
         fig.update_layout(
             annotations=[
                 dict(
-                    x=t_yearly[np.floor(len(t_monthly)/2).astype(int)],
+                    x=t_yearly[np.floor(len(t)/2).astype(int)],
                     y=0,
                     xref="x",
                     yref="y",
@@ -447,30 +448,58 @@ def update_plot_differences(value):
     Plot station timeseries differences
     """
 
-    df = df_temp[ df_temp['stationcode'] == df_temp['stationcode'].unique()[value] ].sort_values(by='year').reset_index(drop=True).dropna()
+    df_compressed = df_temp[ df_temp['stationcode'] == df_temp['stationcode'].unique()[value] ].sort_values(by='year').reset_index(drop=True).dropna()    
+    t_yearly = np.arange( df_compressed.iloc[0].year, df_compressed.iloc[-1].year + 1)
+    df_yearly = pd.DataFrame({'year':t_yearly})
+    df = df_yearly.merge(df_compressed, how='left', on='year')
     dt = df.groupby('year').mean().iloc[:,0:12]
     dn_array = np.array( df.groupby('year').mean().iloc[:,19:31] )
     dn = dt.copy()
     dn.iloc[:,0:] = dn_array
     da = (dt - dn).reset_index()
     de = (df.groupby('year').mean().iloc[:,31:43]).reset_index()
-    sd = (df.groupby('year').mean().iloc[:,43:55]).reset_index()        
-    ts_monthly = np.array( da.groupby('year').mean().iloc[:,0:12]).ravel()    
-    ex_monthly = np.array( de.groupby('year').mean().iloc[:,0:12]).ravel()    
-    sd_monthly = np.array( sd.groupby('year').mean().iloc[:,0:12]).ravel()                   
-    ts_monthly = np.array( moving_average( ts_monthly, nsmooth ) )    
-    ex_monthly = np.array( moving_average( ex_monthly, nsmooth ) )    
-    sd_monthly = np.array( moving_average( sd_monthly, nsmooth ) )    
-    diff_monthly = ts_monthly - ex_monthly
+    ds = (df.groupby('year').mean().iloc[:,43:55]).reset_index()    
+    
+    # TRIM: to start of Pandas datetime range
+        
+    da = da[da.year >= 1678].reset_index(drop=True)
+    de = de[de.year >= 1678].reset_index(drop=True)
+    ds = ds[ds.year >= 1678].reset_index(drop=True)
+            
+    ts_monthly = np.array( da.groupby('year').mean().iloc[:,0:12]).ravel().astype(float)
+    ex_monthly = np.array( de.groupby('year').mean().iloc[:,0:12]).ravel().astype(float)    
+    sd_monthly = np.array( ds.groupby('year').mean().iloc[:,0:12]).ravel().astype(float)           
+
     # Solve Y1677-Y2262 Pandas bug with Xarray:        
-    t_monthly = xr.cftime_range(start=str(da['year'].iloc[0]), periods=len(ts_monthly), freq='M', calendar='noleap')     
-    mask = np.isfinite(ex_monthly) & np.isfinite(ts_monthly)
+#   t_monthly = xr.cftime_range(start=str(da['year'].iloc[0]), periods=len(ts_monthly), freq='M', calendar='noleap')      
+    t_monthly = pd.date_range(start=str(da['year'].iloc[0]), periods=len(ts_monthly), freq='M')     
+    mask = np.array(len(ts_monthly) * [True])
+
+    # COMPUTE: 12-m MA
+    
+    a = pd.Series(ts_monthly).rolling(12, center=True).mean().values
+    e = pd.Series(ex_monthly).rolling(12, center=True).mean().values
+    s = pd.Series(sd_monthly).rolling(12, center=True).mean().values
+
+    t = t_monthly[mask]
+    a = a[mask]
+    e = e[mask]
+    s = s[mask]
+
+    diff_yearly = a - e
+    
+    # CALCULATE: CUSUM
+        	
+    c = np.nancumsum( diff_yearly )
+    x = ( np.arange(len(c)) / len(c) )
+    y = c    
+        
     if mask.sum() > 0:
 
         data = []
 
         trace_error = [                    
-            go.Scatter(x=t_monthly, y=sd_monthly, 
+            go.Scatter(x=t, y=s, 
                        mode='lines', 
                        fill='none',
                        connectgaps=True,
@@ -479,7 +508,7 @@ def update_plot_differences(value):
                        showlegend=False,
 #                      hovertemplate='%{y:.2f}',
             ),
-            go.Scatter(x=t_monthly, y=-sd_monthly, 
+            go.Scatter(x=t, y=-s, 
                        mode='lines', 
                        fill='tonexty',
                        fillcolor='rgba(242,242,242,0.2)',
@@ -491,7 +520,7 @@ def update_plot_differences(value):
             )]
 
         trace_diff = [
-            go.Scatter(x=t_monthly[mask], y=diff_monthly[mask], 
+            go.Scatter(x=t, y=diff_yearly, 
                 mode='lines+markers', 
                 
 #                line=dict(width=1.0, color='rgba(242,242,242,0.2)'),                   # grey                  
@@ -512,7 +541,7 @@ def update_plot_differences(value):
     fig.update_layout(
         template = "plotly_dark",
 #       template = None,
-        xaxis = dict(range=[t_monthly[0],t_monthly[-1]]),       
+        xaxis = dict(range=[t[0],t[-1]]),       
         yaxis_title = {'text': 'Anomaly (from 1961-1990), °C'},
         title = {'text': 'DIFFERENCE (O-E)', 'x':0.1, 'y':0.95},        
     )
@@ -521,7 +550,7 @@ def update_plot_differences(value):
         fig.update_layout(
             annotations=[
                 dict(
-                    x=t_yearly[np.floor(len(t_monthly)/2).astype(int)],
+                    x=t_yearly[np.floor(len(t)/2).astype(int)],
                     y=0,
                     xref="x",
                     yref="y",
@@ -558,35 +587,56 @@ def update_plot_changepoints(value):
     Plot station timeseries CUSUM changepoints
     """
 
-    df = df_temp[ df_temp['stationcode'] == df_temp['stationcode'].unique()[value] ].sort_values(by='year').reset_index(drop=True).dropna()
+    df_compressed = df_temp[ df_temp['stationcode'] == df_temp['stationcode'].unique()[value] ].sort_values(by='year').reset_index(drop=True).dropna()    
+    t_yearly = np.arange( df_compressed.iloc[0].year, df_compressed.iloc[-1].year + 1)
+    df_yearly = pd.DataFrame({'year':t_yearly})
+    df = df_yearly.merge(df_compressed, how='left', on='year')
     dt = df.groupby('year').mean().iloc[:,0:12]
     dn_array = np.array( df.groupby('year').mean().iloc[:,19:31] )
     dn = dt.copy()
     dn.iloc[:,0:] = dn_array
     da = (dt - dn).reset_index()
     de = (df.groupby('year').mean().iloc[:,31:43]).reset_index()
-    sd = (df.groupby('year').mean().iloc[:,43:55]).reset_index()        
-    ts_monthly = np.array( da.groupby('year').mean().iloc[:,0:12]).ravel()    
-    ex_monthly = np.array( de.groupby('year').mean().iloc[:,0:12]).ravel()    
-    sd_monthly = np.array( sd.groupby('year').mean().iloc[:,0:12]).ravel()                   
-    ts_monthly = np.array( moving_average( ts_monthly, nsmooth ) )    
-    ex_monthly = np.array( moving_average( ex_monthly, nsmooth ) )    
-    sd_monthly = np.array( moving_average( sd_monthly, nsmooth ) )    
-    diff_monthly = ts_monthly - ex_monthly
-    # Solve Y1677-Y2262 Pandas bug with Xarray:        
-    t_monthly = xr.cftime_range(start=str(da['year'].iloc[0]), periods=len(ts_monthly), freq='M', calendar='noleap')     
-    mask = np.isfinite(ex_monthly) & np.isfinite(ts_monthly)    
+    ds = (df.groupby('year').mean().iloc[:,43:55]).reset_index()      
+    
+    # TRIM: to start of Pandas datetime range
+        
+    da = da[da.year >= 1678].reset_index(drop=True)
+    de = de[de.year >= 1678].reset_index(drop=True)
+    ds = ds[ds.year >= 1678].reset_index(drop=True)
+      
+    ts_monthly = np.array( da.groupby('year').mean().iloc[:,0:12]).ravel().astype(float)
+    ex_monthly = np.array( de.groupby('year').mean().iloc[:,0:12]).ravel().astype(float)    
+    sd_monthly = np.array( ds.groupby('year').mean().iloc[:,0:12]).ravel().astype(float)           
 
+    # Solve Y1677-Y2262 Pandas bug with Xarray:        
+#   t_monthly = xr.cftime_range(start=str(da['year'].iloc[0]), periods=len(ts_monthly), freq='M', calendar='noleap')      
+    t_monthly = pd.date_range(start=str(da['year'].iloc[0]), periods=len(ts_monthly), freq='M')     
+    mask = np.array(len(ts_monthly) * [True])
+
+    # COMPUTE: 12-m MA
+    
+    a = pd.Series(ts_monthly).rolling(12, center=True).mean().values
+    e = pd.Series(ex_monthly).rolling(12, center=True).mean().values
+    s = pd.Series(sd_monthly).rolling(12, center=True).mean().values
+
+    t = t_monthly[mask]
+    a = a[mask]
+    e = e[mask]
+    s = s[mask]
+
+    diff_yearly = a - e
+    
     # CALCULATE: CUSUM
-    	
-    x = t_monthly[mask]
-    y = np.cumsum( diff_monthly[mask] )
+        	
+    c = np.nancumsum( diff_yearly )
+    x = ( np.arange(len(c)) / len(c) )
+    y = c    
 
     # CALL: cru_changepoint_detector
 
 #    y_fit, y_fit_diff, breakpoints, depth, r, R2adj = cru.changepoint_detector(x, y)
     y_fit, y_fit_diff, y_fit_diff2, slopes, breakpoints, depth, r, R2adj = cru.changepoint_detector(x, y)
-
 
     print('BE WATER MY FRIEND')
 
@@ -594,27 +644,25 @@ def update_plot_changepoints(value):
     
     trace_ltr_cumsum = [
            
-        go.Scatter(x=x[mask], y=y[mask], 
+        go.Scatter(x=t, y=y, 
                 mode='lines+markers', 
                 line=dict(width=1.0, color='rgba(20,115,175,1.0)'),                     # blue (colorsafe)
                 marker=dict(size=5, opacity=0.5, color='rgba(20,115,175,1.0)'),         # blue (colorsafe)
                 name='CUSUM (O-E)',
-#               hovertemplate='%{y:.2f}',
         )] 
 
     trace_ltr = [
            
-        go.Scatter(x=x[mask], y=y_fit, 
+        go.Scatter(x=t, y=y_fit, 
                 mode='lines+markers', 
                 line=dict(width=1.0, color='rgba(234, 89, 78, 1.0)'),                   # red (colorsafe)
                 marker=dict(size=2, opacity=0.5, color='rgba(234, 89, 78, 1.0)'),       # red (colorsafe)
                 name='LTR fit',
-#               hovertemplate='%{y:.2f}',
         )]
     
     trace_ltr_diff = [
            
-        go.Scatter(x=x[mask], y=y_fit_diff, 
+        go.Scatter(x=t, y=y_fit_diff, 
                 mode='lines+markers', 
                 line=dict(width=1.0, color='rgba(229, 176, 57, 1.0)'),                 # mustard (colorsafe)
                 marker=dict(size=2, opacity=0.5, color='rgba(229, 176, 57, 1.0)'),     # mustard (colorsafe)
@@ -623,7 +671,7 @@ def update_plot_changepoints(value):
         
     trace_6_sigma = [                    
     
-        go.Scatter(x=x[mask], y=np.tile( np.abs(np.nanmean(y_fit_diff)) + 6.0*np.abs(np.nanstd(y_fit_diff)), len(x[mask]) ), 
+        go.Scatter(x=t, y=np.tile( np.abs(np.nanmean(y_fit_diff)) + 6.0*np.abs(np.nanstd(y_fit_diff)), len(t) ), 
                        mode='lines', 
                        fill='none',
                        connectgaps=True,
@@ -631,7 +679,7 @@ def update_plot_changepoints(value):
                        name='6 sigma',      
                        showlegend=False,
         ),           
-        go.Scatter(x=x[mask], y=np.tile( np.abs(np.nanmean(y_fit_diff)) - 6.0*np.abs(np.nanstd(y_fit_diff)), len(x[mask]) ), 
+        go.Scatter(x=t, y=np.tile( np.abs(np.nanmean(y_fit_diff)) - 6.0*np.abs(np.nanstd(y_fit_diff)), len(t) ), 
                        mode='lines', 
                        fill='tonexty',
                        fillcolor='rgba(229, 176, 57, 0.2)',
@@ -642,7 +690,7 @@ def update_plot_changepoints(value):
 
     trace_slopes = [
                     
-        go.Scatter(x=x[mask], y=slopes[mask], 
+        go.Scatter(x=t, y=slopes, 
                 mode='lines', 
                 fill='tozeroy',
                 fillcolor='rgba(137, 195, 239, 0.2)',                      # lightblue (colorsafe)
@@ -658,7 +706,7 @@ def update_plot_changepoints(value):
     fig.update_layout(
         template = "plotly_dark",
 #       template = None,
-        xaxis = dict(range=[x[0],x[-1]]),       
+        xaxis = dict(range=[t[0],t[-1]]),       
         yaxis_title = {'text': 'CUSUM (O-E)'},
         title = {'text': 'CHANGEPOINTS', 'x':0.1, 'y':0.95},                          
     )
@@ -667,7 +715,7 @@ def update_plot_changepoints(value):
         fig.update_layout(
             annotations=[
                 dict(
-                    x=t_yearly[np.floor(len(t_monthly)/2).astype(int)],
+                    x=t_yearly[np.floor(len(t)/2).astype(int)],
                     y=0,
                     xref="x",
                     yref="y",
@@ -684,14 +732,14 @@ def update_plot_changepoints(value):
 
     for k in range(len(breakpoints)):
     
-        print(x[mask][breakpoints[k]])    	
+        print(t[breakpoints[k]])    	
         fig.add_shape(type='line',
             yref="y",
             xref="x",
-            x0=x[mask][breakpoints[k]],
-            y0=np.min([slopes[mask].min(),y[mask].min(),y_fit[mask].min()]),
-            x1=x[mask][breakpoints[k]],
-            y1=np.max([slopes[mask].max(),y[mask].max(),y_fit[mask].max()]),
+            x0=t[breakpoints[k]],
+            y0=np.nanmin([np.nanmin(slopes), np.nanmin(y), np.nanmin(y_fit)]),                        
+            x1=t[breakpoints[k]],
+            y1=np.nanmax([np.nanmax(slopes), np.nanmax(y), np.nanmax(y_fit)]),                        
             line=dict(color='rgba(229, 176, 57, 1)', width=1, dash='dot'))
     
     fig.update_layout(
@@ -717,30 +765,51 @@ def update_plot_adjustments(value):
     Plot station timeseries adjustments
     """
 
-    df = df_temp[ df_temp['stationcode'] == df_temp['stationcode'].unique()[value] ].sort_values(by='year').reset_index(drop=True).dropna()
+    df_compressed = df_temp[ df_temp['stationcode'] == df_temp['stationcode'].unique()[value] ].sort_values(by='year').reset_index(drop=True).dropna()    
+    t_yearly = np.arange( df_compressed.iloc[0].year, df_compressed.iloc[-1].year + 1)
+    df_yearly = pd.DataFrame({'year':t_yearly})
+    df = df_yearly.merge(df_compressed, how='left', on='year')
     dt = df.groupby('year').mean().iloc[:,0:12]
     dn_array = np.array( df.groupby('year').mean().iloc[:,19:31] )
     dn = dt.copy()
     dn.iloc[:,0:] = dn_array
     da = (dt - dn).reset_index()
     de = (df.groupby('year').mean().iloc[:,31:43]).reset_index()
-    sd = (df.groupby('year').mean().iloc[:,43:55]).reset_index()        
-    ts_monthly = np.array( da.groupby('year').mean().iloc[:,0:12]).ravel()    
-    ex_monthly = np.array( de.groupby('year').mean().iloc[:,0:12]).ravel()    
-    sd_monthly = np.array( sd.groupby('year').mean().iloc[:,0:12]).ravel()                   
-    dn_monthly = np.array( dn.groupby('year').mean().iloc[:,0:12]).ravel()                   
-    ts_monthly = np.array( moving_average( ts_monthly, nsmooth ) )    
-    ex_monthly = np.array( moving_average( ex_monthly, nsmooth ) )    
-    sd_monthly = np.array( moving_average( sd_monthly, nsmooth ) )    
-    diff_monthly = ts_monthly - ex_monthly
+    ds = (df.groupby('year').mean().iloc[:,43:55]).reset_index()    
+    
+    # TRIM: to start of Pandas datetime range
+        
+    da = da[da.year >= 1678].reset_index(drop=True)
+    de = de[de.year >= 1678].reset_index(drop=True)
+    ds = ds[ds.year >= 1678].reset_index(drop=True)
+        
+    ts_monthly = np.array( da.groupby('year').mean().iloc[:,0:12]).ravel().astype(float)
+    ex_monthly = np.array( de.groupby('year').mean().iloc[:,0:12]).ravel().astype(float)    
+    sd_monthly = np.array( ds.groupby('year').mean().iloc[:,0:12]).ravel().astype(float)           
+
     # Solve Y1677-Y2262 Pandas bug with Xarray:        
-    t_monthly = xr.cftime_range(start=str(da['year'].iloc[0]), periods=len(ts_monthly), freq='M', calendar='noleap')     
-    mask = np.isfinite(ex_monthly) & np.isfinite(ts_monthly)    
-         
+#   t_monthly = xr.cftime_range(start=str(da['year'].iloc[0]), periods=len(ts_monthly), freq='M', calendar='noleap')      
+    t_monthly = pd.date_range(start=str(da['year'].iloc[0]), periods=len(ts_monthly), freq='M')     
+    mask = np.array(len(ts_monthly) * [True])
+
+    # COMPUTE: 12-m MA
+    
+    a = pd.Series(ts_monthly).rolling(12, center=True).mean().values
+    e = pd.Series(ex_monthly).rolling(12, center=True).mean().values
+    s = pd.Series(sd_monthly).rolling(12, center=True).mean().values
+
+    t = t_monthly[mask]
+    a = a[mask]
+    e = e[mask]
+    s = s[mask]
+
+    diff_yearly = a - e
+    
     # CALCULATE: CUSUM
-    	
-    x = t_monthly[mask]
-    y = np.cumsum( diff_monthly[mask] )
+        	
+    c = np.nancumsum( diff_yearly )
+    x = ( np.arange(len(c)) / len(c) )
+    y = c    
     
     # CALL: cru_changepoint_detector
 
@@ -749,10 +818,10 @@ def update_plot_adjustments(value):
        
     if len(breakpoints) == 0:
     
-        mask = np.array(len(x)*[False])
+        mask = np.array(len(t)*[False])
         data = []
         trace_obs = [
-            go.Scatter(x=t_monthly, y=ts_monthly, 
+            go.Scatter(x=t, y=a, 
                 mode='lines+markers', 
                 line=dict(width=1.0, color='rgba(20,115,175,0.0)'),                  # blue (colorsafe)
                 marker=dict(size=5, opacity=0.5, color='rgba(20,115,175,0.0)'),      # blue (colorsafe)
@@ -773,16 +842,16 @@ def update_plot_adjustments(value):
         y_means = []
         for j in range(len(breakpoints_all)+1):                
             if j == 0:              
-                y_means = y_means + list( len( ts_monthly[mask][0:breakpoints_idx[0]] ) * [ -np.nanmean(ts_monthly[mask][0:breakpoints_idx[0]]) + np.nanmean(ex_monthly[mask][0:breakpoints_idx[0]]) ] ) 
+                y_means = y_means + list( len( a[0:breakpoints_idx[0]] ) * [ -np.nanmean(a[0:breakpoints_idx[0]]) + np.nanmean(e[0:breakpoints_idx[0]]) ] ) 
             if (j > 0) & (j<len(breakpoints_all)):
-                y_means = y_means + list( len( ts_monthly[mask][breakpoints_idx[j-1]:breakpoints_idx[j]] ) * [ -np.nanmean(ts_monthly[mask][breakpoints_idx[j-1]:breakpoints_idx[j]]) + np.nanmean(ex_monthly[mask][breakpoints_idx[j-1]:breakpoints_idx[j]]) ] ) 
+                y_means = y_means + list( len( a[breakpoints_idx[j-1]:breakpoints_idx[j]] ) * [ -np.nanmean(a[breakpoints_idx[j-1]:breakpoints_idx[j]]) + np.nanmean(e[breakpoints_idx[j-1]:breakpoints_idx[j]]) ] ) 
             if (j == len(breakpoints_all)):              
-                y_means = y_means + list( len( ts_monthly[mask][breakpoints_idx[-1]:] ) * [ -np.nanmean(ts_monthly[mask][breakpoints_idx[-1]:]) + np.nanmean(ex_monthly[mask][breakpoints_idx[-1]:]) ] ) 
+                y_means = y_means + list( len( a[breakpoints_idx[-1]:] ) * [ -np.nanmean(a[breakpoints_idx[-1]:]) + np.nanmean(e[breakpoints_idx[-1]:]) ] ) 
 
         data = []
                          
         trace_error = [
-            go.Scatter(x=t_monthly[mask], y=ex_monthly[mask]+sd_monthly[mask], 
+            go.Scatter(x=t, y=e+s, 
                        mode='lines', 
                        fill='none',
                        connectgaps=True,
@@ -791,7 +860,7 @@ def update_plot_adjustments(value):
                        showlegend=False,
 #                      hovertemplate='%{y:.2f}',
             ),
-            go.Scatter(x=t_monthly[mask], y=ex_monthly[mask]-sd_monthly[mask], 
+            go.Scatter(x=t, y=e-s, 
                        mode='lines', 
                        fill='tonexty',
                        fillcolor='rgba(242,242,242,0.2)',                               # grey
@@ -803,7 +872,7 @@ def update_plot_adjustments(value):
             )]   
             	
         trace_obs = [
-            go.Scatter(x=t_monthly, y=ts_monthly, 
+            go.Scatter(x=t, y=a, 
                 mode='lines+markers', 
                 line=dict(width=1.0, color='rgba(20,115,175,1.0)'),                  # blue (colorsafe)
                 marker=dict(size=5, opacity=0.5, color='rgba(20,115,175,1.0)'),      # blue (colorsafe)
@@ -812,7 +881,7 @@ def update_plot_adjustments(value):
             )]   
 
         trace_expect = [            
-            go.Scatter(x=t_monthly, y=ex_monthly, 
+            go.Scatter(x=t, y=e, 
                 mode='lines+markers', 
                 line=dict(width=1.0, color='rgba(234, 89, 78, 1.0)'),                 # red (colorsafe)
                 marker=dict(size=5, opacity=0.5, color='rgba(234, 89, 78, 1.0)'),     # red (colorsafe)
@@ -822,7 +891,7 @@ def update_plot_adjustments(value):
 
         trace_obs_adjusted = [
                
-            go.Scatter(x=x[mask], y=ts_monthly + y_means, 
+            go.Scatter(x=t, y=a + y_means, 
                     mode='lines+markers', 
                     line=dict(width=1.0, color='rgba(137, 195, 239, 1.0)'),                 # lightblue (colorsafe)
                     marker=dict(size=2, opacity=0.5, color='rgba(137, 195, 239, 1.0)'),     # lightblue (colorsafe)
@@ -832,7 +901,7 @@ def update_plot_adjustments(value):
                     
         trace_adjustments = [
                
-            go.Scatter(x=x[mask], y=y_means, 
+            go.Scatter(x=t, y=y_means, 
                     mode='lines+markers', 
                     line=dict(width=1.0, color='rgba(229, 176, 57, 1.0)'),                 # mustard (colorsafe)
                     marker=dict(size=3, opacity=0.5, color='rgba(229, 176, 57, 1.0)'),     # mustard (colorsafe)
@@ -846,7 +915,7 @@ def update_plot_adjustments(value):
     fig.update_layout(
         template = "plotly_dark",
 #       template = None,
-        xaxis = dict(range=[x[0],x[-1]]),       
+        xaxis = dict(range=[t[0],t[-1]]),       
         yaxis_title = {'text': 'Anomaly (from 1961-1990), °C'},
         title = {'text': 'ADJUSTMENTS', 'x':0.1, 'y':0.95},                           
     )
@@ -855,7 +924,7 @@ def update_plot_adjustments(value):
         fig.update_layout(
             annotations=[
                 dict(
-                    x=t_monthly[np.floor(len(t_monthly)/2).astype('int')],
+                    x=t[np.floor(len(t)/2).astype('int')],
                     y=0,
                     xref="x",
                     yref="y",
@@ -871,17 +940,17 @@ def update_plot_adjustments(value):
         )    
 
     for k in range(len(breakpoints)):
-    
-        print(x[mask][breakpoints[k]])    	
+
         fig.add_shape(type='line',
             yref="y",
             xref="x",
-            x0=t_monthly[mask][breakpoints[k]],
-            y0=np.min([ts_monthly[mask].min(),ex_monthly[mask].min(), np.array(ex_monthly[mask]-sd_monthly[mask]).min() ]),
-            x1=t_monthly[mask][breakpoints[k]],
-            y1=np.max([ts_monthly[mask].max(),ex_monthly[mask].max(), np.array(ex_monthly[mask]+sd_monthly[mask]).max() ]),
-            line=dict(color='rgba(229, 176, 57, 1)', width=1, dash='dot'))
-    
+            x0=t[breakpoints[k]],
+            y0=np.nanmin([np.nanmin(a), np.nanmin(e), np.nanmin(e-s)]),
+            x1=t[breakpoints[k]],
+            y1=np.nanmax([np.nanmax(a), np.nanmax(e), np.nanmax(e+s)]),
+            line=dict(color='rgba(229, 176, 57, 1)', width=1, dash='dot'),
+       )
+
     fig.update_layout(
         legend=dict(
             orientation='h',
@@ -905,29 +974,55 @@ def update_plot_seasonal(value):
     Plot seasonal local expectations
     """
 
-    df = df_temp[ df_temp['stationcode'] == df_temp['stationcode'].unique()[value] ].sort_values(by='year').reset_index(drop=True).dropna()
+#    df = df_temp[ df_temp['stationcode'] == df_temp['stationcode'].unique()[value] ].sort_values(by='year').reset_index(drop=True).dropna()
+#    dt = df.groupby('year').mean().iloc[:,0:12]
+#    dn_array = np.array( df.groupby('year').mean().iloc[:,19:31] )
+#    dn = dt.copy()
+#    dn.iloc[:,0:] = dn_array
+#    da = (dt - dn).reset_index()
+#    de = (df.groupby('year').mean().iloc[:,31:43]).reset_index()
+#    sd = (df.groupby('year').mean().iloc[:,43:55]).reset_index()      
+#    
+#    # TRIM: to start of Pandas datetime range
+#    
+#    da = da[da.year >= 1678].reset_index(drop=True)
+#    de = de[de.year >= 1678].reset_index(drop=True)
+#    sd = sd[sd.year >= 1678].reset_index(drop=True)
+#          
+#    ts_monthly = np.array( da.groupby('year').mean().iloc[:,0:12]).ravel()    
+#    ex_monthly = np.array( de.groupby('year').mean().iloc[:,0:12]).ravel()    
+#    sd_monthly = np.array( sd.groupby('year').mean().iloc[:,0:12]).ravel()                   
+
+    df_compressed = df_temp[ df_temp['stationcode'] == df_temp['stationcode'].unique()[value] ].sort_values(by='year').reset_index(drop=True).dropna()    
+    t_yearly = np.arange( df_compressed.iloc[0].year, df_compressed.iloc[-1].year + 1)
+    df_yearly = pd.DataFrame({'year':t_yearly})
+    df = df_yearly.merge(df_compressed, how='left', on='year')
     dt = df.groupby('year').mean().iloc[:,0:12]
     dn_array = np.array( df.groupby('year').mean().iloc[:,19:31] )
     dn = dt.copy()
     dn.iloc[:,0:] = dn_array
     da = (dt - dn).reset_index()
     de = (df.groupby('year').mean().iloc[:,31:43]).reset_index()
-    sd = (df.groupby('year').mean().iloc[:,43:55]).reset_index()      
+    ds = (df.groupby('year').mean().iloc[:,43:55]).reset_index()    
     
+    # TRIM: to start of Pandas datetime range
+        
     da = da[da.year >= 1678].reset_index(drop=True)
     de = de[de.year >= 1678].reset_index(drop=True)
-    sd = sd[sd.year >= 1678].reset_index(drop=True)
-          
-    ts_monthly = np.array( da.groupby('year').mean().iloc[:,0:12]).ravel()    
-    ex_monthly = np.array( de.groupby('year').mean().iloc[:,0:12]).ravel()    
-    sd_monthly = np.array( sd.groupby('year').mean().iloc[:,0:12]).ravel()                   
-#    ts_monthly = np.array( moving_average( ts_monthly, nsmooth ) )    
-#    ex_monthly = np.array( moving_average( ex_monthly, nsmooth ) )    
-#    sd_monthly = np.array( moving_average( sd_monthly, nsmooth ) )    
+    ds = ds[ds.year >= 1678].reset_index(drop=True)
+        
+    ts_monthly = np.array( da.groupby('year').mean().iloc[:,0:12]).ravel().astype(float)
+    ex_monthly = np.array( de.groupby('year').mean().iloc[:,0:12]).ravel().astype(float)    
+    sd_monthly = np.array( ds.groupby('year').mean().iloc[:,0:12]).ravel().astype(float)           
+
+    # Solve Y1677-Y2262 Pandas bug with Xarray:        
+#   t_monthly = xr.cftime_range(start=str(da['year'].iloc[0]), periods=len(ts_monthly), freq='M', calendar='noleap')      
+    t_monthly = pd.date_range(start=str(da['year'].iloc[0]), periods=len(ts_monthly), freq='M')     
+    mask = np.array(len(ts_monthly) * [True])
+    
+    # EXTRACT: seasonal components
 
     trim_months = len(ex_monthly)%12
- 
-    t_monthly = pd.date_range(start=str(da.year.iloc[0]), periods=len(ex_monthly), freq='MS')    
     df = pd.DataFrame({'Tg':ex_monthly[:-1-trim_months]}, index=t_monthly[:-1-trim_months])     
     
     t = [ pd.to_datetime( str(df.index.year.unique()[i])+'-01-01') for i in range(len(df.index.year.unique())) ][1:] # years
@@ -935,14 +1030,11 @@ def update_plot_seasonal(value):
     MAM = ( df[df.index.month==3]['Tg'].values[1:] + df[df.index.month==4]['Tg'].values[1:] + df[df.index.month==5]['Tg'].values[1:] ) / 3
     JJA = ( df[df.index.month==6]['Tg'].values[1:] + df[df.index.month==7]['Tg'].values[1:] + df[df.index.month==8]['Tg'].values[1:] ) / 3
     SON = ( df[df.index.month==9]['Tg'].values[1:] + df[df.index.month==10]['Tg'].values[1:] + df[df.index.month==11]['Tg'].values[1:] ) / 3
-    
-    
-    df_seasonal = pd.DataFrame({'DJF':DJF, 'MAM':MAM, 'JJA':JJA, 'SON':SON}, index = t)
-          
+        
+    df_seasonal = pd.DataFrame({'DJF':DJF, 'MAM':MAM, 'JJA':JJA, 'SON':SON}, index = t)     
     df_seasonal_ma = df_seasonal.rolling(10, center=True).mean() # decadal smoothing
     mask = np.isfinite(df_seasonal_ma)
 
-#   dates = pd.date_range(start='1678-01-01', end='2021-12-01', freq='MS')
     dates = df_seasonal_ma.index
     df_seasonal_fft = pd.DataFrame(index=dates)
     df_seasonal_fft['DJF'] = pd.DataFrame({'DJF':smooth_fft(df_seasonal_ma['DJF'].values[mask['DJF']], nfft)}, index=df_seasonal_ma['DJF'].index[mask['DJF']])
@@ -984,11 +1076,6 @@ def update_plot_seasonal(value):
                 marker=dict(size=7, symbol='square', opacity=0.5, color='rgba(229, 176, 57, 0.5)', line_width=1, line_color='rgba(229, 176, 57, 0.5)'),       
                 name='SON')
     ]
-
-#                line=dict(width=1.0, color='rgba(234, 89, 78, 1.0)'),                  # red (colorsafe)                      
-#                line=dict(width=1.0, color='rgba(20,115,175,1.0)'),                    # blue (colorsafe)
-#                line=dict(width=1.0, color='rgba(137, 195, 239, 1.0)'),                # lightblue (colorsafe)                               
-#                line=dict(width=1.0, color='rgba(229, 176, 57, 1.0)'),                 # mustard (colorsafe)
     
     data = data + trace_winter + trace_spring + trace_summer + trace_autumn
                                           
@@ -1020,13 +1107,15 @@ def update_plot_seasonal(value):
                 )
             ]
         )    
-    fig.update_layout(legend=dict(
-        orientation='v',
-        yanchor="top",
-        y=0.4,
-        xanchor="left",
-        x=0.8),
-    )    
+
+    fig.update_layout(
+        legend=dict(
+            orientation='h',
+            yanchor="top",
+            y=0.1,
+            xanchor="left",
+            x=0.05),              
+    )        
     fig.update_layout(height=400, width=550, margin={"r":10,"t":50,"l":70,"b":50})    
 
     return fig
@@ -1042,30 +1131,51 @@ def update_breakpoints(value):
     Display breakpoints
     """
 
-    df = df_temp[ df_temp['stationcode'] == df_temp['stationcode'].unique()[value] ].sort_values(by='year').reset_index(drop=True).dropna()
+    df_compressed = df_temp[ df_temp['stationcode'] == df_temp['stationcode'].unique()[value] ].sort_values(by='year').reset_index(drop=True).dropna()    
+    t_yearly = np.arange( df_compressed.iloc[0].year, df_compressed.iloc[-1].year + 1)
+    df_yearly = pd.DataFrame({'year':t_yearly})
+    df = df_yearly.merge(df_compressed, how='left', on='year')
     dt = df.groupby('year').mean().iloc[:,0:12]
     dn_array = np.array( df.groupby('year').mean().iloc[:,19:31] )
     dn = dt.copy()
     dn.iloc[:,0:] = dn_array
     da = (dt - dn).reset_index()
     de = (df.groupby('year').mean().iloc[:,31:43]).reset_index()
-    sd = (df.groupby('year').mean().iloc[:,43:55]).reset_index()        
-    ts_monthly = np.array( da.groupby('year').mean().iloc[:,0:12]).ravel()    
-    ex_monthly = np.array( de.groupby('year').mean().iloc[:,0:12]).ravel()    
-    sd_monthly = np.array( sd.groupby('year').mean().iloc[:,0:12]).ravel()                   
-    dn_monthly = np.array( dn.groupby('year').mean().iloc[:,0:12]).ravel()                   
-    ts_monthly = np.array( moving_average( ts_monthly, nsmooth ) )    
-    ex_monthly = np.array( moving_average( ex_monthly, nsmooth ) )    
-    sd_monthly = np.array( moving_average( sd_monthly, nsmooth ) )    
-    diff_monthly = ts_monthly - ex_monthly
+    ds = (df.groupby('year').mean().iloc[:,43:55]).reset_index()        
+    
+    # TRIM: to start of Pandas datetime range
+        
+    da = da[da.year >= 1678].reset_index(drop=True)
+    de = de[de.year >= 1678].reset_index(drop=True)
+    ds = ds[ds.year >= 1678].reset_index(drop=True)
+    
+    ts_monthly = np.array( da.groupby('year').mean().iloc[:,0:12]).ravel().astype(float)
+    ex_monthly = np.array( de.groupby('year').mean().iloc[:,0:12]).ravel().astype(float)    
+    sd_monthly = np.array( ds.groupby('year').mean().iloc[:,0:12]).ravel().astype(float)           
+
     # Solve Y1677-Y2262 Pandas bug with Xarray:        
-    t_monthly = xr.cftime_range(start=str(da['year'].iloc[0]), periods=len(ts_monthly), freq='M', calendar='noleap')     
-    mask = np.isfinite(ex_monthly) & np.isfinite(ts_monthly)    
-         
+#   t_monthly = xr.cftime_range(start=str(da['year'].iloc[0]), periods=len(ts_monthly), freq='M', calendar='noleap')      
+    t_monthly = pd.date_range(start=str(da['year'].iloc[0]), periods=len(ts_monthly), freq='M')     
+    mask = np.array(len(ts_monthly) * [True])
+
+    # COMPUTE: 12-m MA
+    
+    a = pd.Series(ts_monthly).rolling(12, center=True).mean().values
+    e = pd.Series(ex_monthly).rolling(12, center=True).mean().values
+    s = pd.Series(sd_monthly).rolling(12, center=True).mean().values
+
+    t = t_monthly[mask]
+    a = a[mask]
+    e = e[mask]
+    s = s[mask]
+
+    diff_yearly = a - e
+    
     # CALCULATE: CUSUM
-    	
-    x = t_monthly[mask]
-    y = np.cumsum( diff_monthly[mask] )
+        	
+    c = np.nancumsum( diff_yearly )
+    x = ( np.arange(len(c)) / len(c) )
+    y = c    
     
     # CALL: cru_changepoint_detector
 
