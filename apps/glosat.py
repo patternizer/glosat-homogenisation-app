@@ -279,8 +279,8 @@ def update_plot_worldmap(value):
     
     fig = go.Figure(
 #	px.set_mapbox_access_token(open(".mapbox_token").read()),
-#        px.scatter_mapbox(da, lat='stationlat', lon='stationlon', color_discrete_sequence=['rgba(234, 89, 78, 1.0)'], size_max=10, zoom=10, opacity=0.7)
-        px.scatter_mapbox(lat=df['stationlat'], lon=df['stationlon'], text=df.index, color_discrete_sequence=['rgba(234, 89, 78, 1.0)'], zoom=3, opacity=0.7)
+        px.scatter_mapbox(da, lat='stationlat', lon='stationlon', color_discrete_sequence=['rgba(234, 89, 78, 1.0)'], size_max=10, zoom=5, opacity=0.7)
+#        px.scatter_mapbox(lat=df['stationlat'], lon=df['stationlon'], text=df.index, color_discrete_sequence=['rgba(234, 89, 78, 1.0)'], zoom=3, opacity=0.7)
 #        dl.Map([dl.TileLayer(), cluster], center=(33, 33), zoom=3, id="map", style={'width': '100%', 'height': '50vh', 'margin': "auto", "display": "block"}),
    )
  
@@ -493,7 +493,12 @@ def update_plot_differences(value):
     c = np.nancumsum( diff_yearly )
     x = ( np.arange(len(c)) / len(c) )
     y = c    
-        
+
+    # CALL: cru_changepoint_detector
+
+#    y_fit, y_fit_diff, breakpoints, depth, r, R2adj = cru.changepoint_detector(x, y)
+    y_fit, y_fit_diff, y_fit_diff2, slopes, breakpoints, depth, r, R2adj = cru.changepoint_detector(x, y)
+            
     if mask.sum() > 0:
 
         data = []
@@ -564,6 +569,19 @@ def update_plot_differences(value):
                 )
             ]
         )    
+        
+    for k in range(len(breakpoints)):
+    
+        print(t[breakpoints[k]])    	
+        fig.add_shape(type='line',
+            yref="y",
+            xref="x",
+            x0=t[breakpoints[k]],
+            y0=np.nanmin([np.nanmin(diff_yearly), np.nanmin(s)]),                        
+            x1=t[breakpoints[k]],
+            y1=np.nanmax([np.nanmax(diff_yearly), np.nanmax(s)]),    
+            line=dict(color='rgba(229, 176, 57, 1)', width=1, dash='dot'))        
+        
     fig.update_layout(
         legend=dict(
             orientation='h',
