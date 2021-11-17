@@ -577,7 +577,7 @@ def update_plot_differences(value):
             yref="y",
             xref="x",
             x0=t[breakpoints[k]],
-            y0=np.nanmin([np.nanmin(diff_yearly), np.nanmin(s)]),                        
+            y0=np.nanmin([np.nanmin(diff_yearly), np.nanmin(-s)]),                        
             x1=t[breakpoints[k]],
             y1=np.nanmax([np.nanmax(diff_yearly), np.nanmax(s)]),    
             line=dict(color='rgba(229, 176, 57, 1)', width=1, dash='dot'))        
