@@ -172,15 +172,15 @@ layout = html.Div([
 
         dbc.Row([
             dbc.Col(html.Div([
-                dcc.Graph(id="plot-worldmap", style = {'padding' : '10px', 'width': '100%', 'display': 'inline-block'}),                                    
-            ]), 
-            width={'size':6}, 
-            ),           
-            dbc.Col(html.Div([
                 dcc.Graph(id="plot-seasonal", style = {'padding' : '10px', 'width': '100%', 'display': 'inline-block'}),                                    
             ]), 
             width={'size':6}, 
             ),           
+            dbc.Col( html.Div([
+                dcc.Graph(id="breakpoints", style = {'padding' : '10px', 'width': '100%', 'display': 'inline-block'}), 
+            ]), 
+            width={'size':6}, 
+            ),     
         ]),
         
         dbc.Row([
@@ -194,12 +194,12 @@ layout = html.Div([
             ],
             style = {'padding' : '10px', 'width': '100%', 'display': 'inline-block'}),    
             width={'size':6}, 
-            ),                        
-            dbc.Col( html.Div([
-                dcc.Graph(id="breakpoints", style = {'padding' : '10px', 'width': '100%', 'display': 'inline-block'}), 
-            ]), 
-            width={'size':6}, 
-            ),     
+            ),   
+#            dbc.Col(html.Div([
+#                dcc.Graph(id="plot-worldmap", style = {'padding' : '10px', 'width': '100%', 'display': 'inline-block'}),                                    
+#            ]), 
+#            width={'size':6}, 
+#            ),                                            
         ]),
             
     ]),
