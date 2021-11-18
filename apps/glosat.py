@@ -991,26 +991,7 @@ def update_plot_seasonal(value):
     """
     Plot seasonal local expectations
     """
-
-#    df = df_temp[ df_temp['stationcode'] == df_temp['stationcode'].unique()[value] ].sort_values(by='year').reset_index(drop=True).dropna()
-#    dt = df.groupby('year').mean().iloc[:,0:12]
-#    dn_array = np.array( df.groupby('year').mean().iloc[:,19:31] )
-#    dn = dt.copy()
-#    dn.iloc[:,0:] = dn_array
-#    da = (dt - dn).reset_index()
-#    de = (df.groupby('year').mean().iloc[:,31:43]).reset_index()
-#    sd = (df.groupby('year').mean().iloc[:,43:55]).reset_index()      
-#    
-#    # TRIM: to start of Pandas datetime range
-#    
-#    da = da[da.year >= 1678].reset_index(drop=True)
-#    de = de[de.year >= 1678].reset_index(drop=True)
-#    sd = sd[sd.year >= 1678].reset_index(drop=True)
-#          
-#    ts_monthly = np.array( da.groupby('year').mean().iloc[:,0:12]).ravel()    
-#    ex_monthly = np.array( de.groupby('year').mean().iloc[:,0:12]).ravel()    
-#    sd_monthly = np.array( sd.groupby('year').mean().iloc[:,0:12]).ravel()                   
-
+             
     df_compressed = df_temp[ df_temp['stationcode'] == df_temp['stationcode'].unique()[value] ].sort_values(by='year').reset_index(drop=True).dropna()    
     t_yearly = np.arange( df_compressed.iloc[0].year, df_compressed.iloc[-1].year + 1)
     df_yearly = pd.DataFrame({'year':t_yearly})
@@ -1048,8 +1029,11 @@ def update_plot_seasonal(value):
     MAM = ( df[df.index.month==3]['Tg'].values[1:] + df[df.index.month==4]['Tg'].values[1:] + df[df.index.month==5]['Tg'].values[1:] ) / 3
     JJA = ( df[df.index.month==6]['Tg'].values[1:] + df[df.index.month==7]['Tg'].values[1:] + df[df.index.month==8]['Tg'].values[1:] ) / 3
     SON = ( df[df.index.month==9]['Tg'].values[1:] + df[df.index.month==10]['Tg'].values[1:] + df[df.index.month==11]['Tg'].values[1:] ) / 3
+
+    ONDJFM = ( df[df.index.month==10]['Tg'].values[1:] + df[df.index.month==11]['Tg'].values[1:] + df[df.index.month==12]['Tg'].values + df[df.index.month==1]['Tg'].values[1:] + df[df.index.month==2]['Tg'].values[1:] + df[df.index.month==3]['Tg'].values[1:] ) / 6
+    AMJJAS = ( df[df.index.month==4]['Tg'].values[1:] + df[df.index.month==5]['Tg'].values[1:] + df[df.index.month==6]['Tg'].values[1:] + df[df.index.month==7]['Tg'].values[1:] + df[df.index.month==8]['Tg'].values[1:] + df[df.index.month==9]['Tg'].values[1:] ) / 6
         
-    df_seasonal = pd.DataFrame({'DJF':DJF, 'MAM':MAM, 'JJA':JJA, 'SON':SON}, index = t)     
+    df_seasonal = pd.DataFrame({'DJF':DJF, 'MAM':MAM, 'JJA':JJA, 'SON':SON, 'ONDJFM':ONDJFM, 'AMJJAS':AMJJAS}, index = t)     
     df_seasonal_ma = df_seasonal.rolling(10, center=True).mean() # decadal smoothing
     mask = np.isfinite(df_seasonal_ma)
 
@@ -1059,43 +1043,62 @@ def update_plot_seasonal(value):
     df_seasonal_fft['MAM'] = pd.DataFrame({'DJF':smooth_fft(df_seasonal_ma['MAM'].values[mask['MAM']], nfft)}, index=df_seasonal_ma['MAM'].index[mask['MAM']])
     df_seasonal_fft['JJA'] = pd.DataFrame({'DJF':smooth_fft(df_seasonal_ma['JJA'].values[mask['JJA']], nfft)}, index=df_seasonal_ma['JJA'].index[mask['JJA']])
     df_seasonal_fft['SON'] = pd.DataFrame({'DJF':smooth_fft(df_seasonal_ma['SON'].values[mask['SON']], nfft)}, index=df_seasonal_ma['SON'].index[mask['SON']])
+    df_seasonal_fft['ONDJFM'] = pd.DataFrame({'ONDJFM':smooth_fft(df_seasonal_ma['ONDJFM'].values[mask['ONDJFM']], nfft)}, index=df_seasonal_ma['ONDJFM'].index[mask['ONDJFM']])
+    df_seasonal_fft['AMJJAS'] = pd.DataFrame({'AMJJAS':smooth_fft(df_seasonal_ma['AMJJAS'].values[mask['AMJJAS']], nfft)}, index=df_seasonal_ma['AMJJAS'].index[mask['AMJJAS']])
                 
     mask = np.isfinite(df_seasonal_fft)
     data = []
     trace_winter=[
             go.Scatter(                                  
-                x=df_seasonal_fft.index[mask['DJF']], y=df_seasonal_fft['DJF'][mask['DJF']], 
+                x=df_seasonal_fft.index[mask['ONDJFM']], y=df_seasonal_fft['ONDJFM'][mask['ONDJFM']], 
                 mode='lines+markers', 
                 line=dict(width=1, color='rgba(20,115,175,0.5)'),
                 marker=dict(size=7, symbol='square', opacity=0.5, color='rgba(20,115,175,0.5)', line_width=1, line_color='rgba(20,115,175,0.5)'),                       
-                name='DJF')
-    ]
-    trace_spring=[
-            go.Scatter(                                  
-                x=df_seasonal_fft.index[mask['MAM']], y=df_seasonal_fft['MAM'][mask['MAM']], 
-                mode='lines+markers', 
-                line=dict(width=1, color='rgba(137, 195, 239, 0.5)'),
-                marker=dict(size=7, symbol='square', opacity=0.5, color='rgba(137, 195, 239, 0.5)', line_width=1, line_color='rgba(137, 195, 239, 1.0)'),       
-                name='MAM')
+                name='ONDJFM')
     ]
     trace_summer=[
             go.Scatter(                                  
-                x=df_seasonal_fft.index[mask['JJA']], y=df_seasonal_fft['JJA'][mask['JJA']], 
+                x=df_seasonal_fft.index[mask['AMJJAS']], y=df_seasonal_fft['AMJJAS'][mask['AMJJAS']], 
                 mode='lines+markers', 
                 line=dict(width=1, color='rgba(234, 89, 78, 0.5)'),
                 marker=dict(size=7, symbol='square', opacity=0.5, color='rgba(234, 89, 78, 0.5)', line_width=1, line_color='rgba(234, 89, 78, 0.5)'),       
-                name='JJA')
-    ]
-    trace_autumn=[
-            go.Scatter(                                  
-                x=df_seasonal_fft.index[mask['SON']], y=df_seasonal_fft['SON'][mask['SON']], 
-                mode='lines+markers', 
-                line=dict(width=1, color='rgba(229, 176, 57, 0.5)'),
-                marker=dict(size=7, symbol='square', opacity=0.5, color='rgba(229, 176, 57, 0.5)', line_width=1, line_color='rgba(229, 176, 57, 0.5)'),       
-                name='SON')
-    ]
+                name='AMJJAS')
+    ]                
+#    trace_winter=[
+#            go.Scatter(                                  
+#                x=df_seasonal_fft.index[mask['DJF']], y=df_seasonal_fft['DJF'][mask['DJF']], 
+#                mode='lines+markers', 
+#                line=dict(width=1, color='rgba(20,115,175,0.5)'),
+#                marker=dict(size=7, symbol='square', opacity=0.5, color='rgba(20,115,175,0.5)', line_width=1, line_color='rgba(20,115,175,0.5)'),                       
+#                name='DJF')
+#    ]
+#    trace_spring=[
+#            go.Scatter(                                  
+#                x=df_seasonal_fft.index[mask['MAM']], y=df_seasonal_fft['MAM'][mask['MAM']], 
+#                mode='lines+markers', 
+#                line=dict(width=1, color='rgba(137, 195, 239, 0.5)'),
+#                marker=dict(size=7, symbol='square', opacity=0.5, color='rgba(137, 195, 239, 0.5)', line_width=1, line_color='rgba(137, 195, 239, 1.0)'),       
+#                name='MAM')
+#    ]
+#    trace_summer=[
+#            go.Scatter(                                  
+#                x=df_seasonal_fft.index[mask['JJA']], y=df_seasonal_fft['JJA'][mask['JJA']], 
+#                mode='lines+markers', 
+#                line=dict(width=1, color='rgba(234, 89, 78, 0.5)'),
+#                marker=dict(size=7, symbol='square', opacity=0.5, color='rgba(234, 89, 78, 0.5)', line_width=1, line_color='rgba(234, 89, 78, 0.5)'),       
+#                name='JJA')
+#    ]
+#    trace_autumn=[
+#            go.Scatter(                                  
+#                x=df_seasonal_fft.index[mask['SON']], y=df_seasonal_fft['SON'][mask['SON']], 
+#                mode='lines+markers', 
+#                line=dict(width=1, color='rgba(229, 176, 57, 0.5)'),
+#                marker=dict(size=7, symbol='square', opacity=0.5, color='rgba(229, 176, 57, 0.5)', line_width=1, line_color='rgba(229, 176, 57, 0.5)'),       
+#                name='SON')
+#    ]
     
-    data = data + trace_winter + trace_spring + trace_summer + trace_autumn
+    data = data + trace_winter + trace_summer
+#    data = data + trace_winter + trace_spring + trace_summer + trace_autumn
                                           
     fig = go.Figure(data)
     fig.update_layout(
