@@ -71,7 +71,7 @@ stationstr = stationcodestr + ': ' + stationnamestr
 opts = [{'label' : stationstr[i], 'value' : i} for i in range(len(stationstr))]
 
 #==============================================================================
-value = np.where(df_temp['stationcode'].unique()=='619930')[0][0] # Pamplemousses
+# value = np.where(df_temp['stationcode'].unique()=='619930')[0][0] # Pamplemousses
 #==============================================================================
 
 #----------------------------------------------------------------------------------
