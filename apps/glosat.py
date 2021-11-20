@@ -804,9 +804,6 @@ def update_plot_adjustments(value):
     ts_monthly = np.array( da.groupby('year').mean().iloc[:,0:12]).ravel().astype(float)
     ex_monthly = np.array( de.groupby('year').mean().iloc[:,0:12]).ravel().astype(float)    
     sd_monthly = np.array( ds.groupby('year').mean().iloc[:,0:12]).ravel().astype(float)           
-
-    # Solve Y1677-Y2262 Pandas bug with Xarray:        
-#   t_monthly = xr.cftime_range(start=str(da['year'].iloc[0]), periods=len(ts_monthly), freq='M', calendar='noleap')      
     t_monthly = pd.date_range(start=str(da['year'].iloc[0]), periods=len(ts_monthly), freq='M')     
     mask = np.array(len(ts_monthly) * [True])
 
@@ -1013,44 +1010,59 @@ def update_plot_seasonal(value):
     ts_monthly = np.array( da.groupby('year').mean().iloc[:,0:12]).ravel().astype(float)
     ex_monthly = np.array( de.groupby('year').mean().iloc[:,0:12]).ravel().astype(float)    
     sd_monthly = np.array( ds.groupby('year').mean().iloc[:,0:12]).ravel().astype(float)           
-
-    # Solve Y1677-Y2262 Pandas bug with Xarray:        
-#   t_monthly = xr.cftime_range(start=str(da['year'].iloc[0]), periods=len(ts_monthly), freq='M', calendar='noleap')      
     t_monthly = pd.date_range(start=str(da['year'].iloc[0]), periods=len(ts_monthly), freq='M')     
     mask = np.array(len(ts_monthly) * [True])
+
+    # COMPUTE: 12-m MA
+    
+    a = pd.Series(ts_monthly).rolling(12, center=True).mean().values
+    e = pd.Series(ex_monthly).rolling(12, center=True).mean().values
+    s = pd.Series(sd_monthly).rolling(12, center=True).mean().values
+
+    t = t_monthly[mask]
+    a = a[mask]
+    e = e[mask]
+    s = s[mask]
+
+    diff_yearly = a - e
+    
+    # CALCULATE: CUSUM
+        	
+    c = np.nancumsum( diff_yearly )
+    x = ( np.arange(len(c)) / len(c) )
+    y = c    
+    
+    # CALL: cru_changepoint_detector
+
+    #y_fit, y_fit_diff, breakpoints, depth, r, R2adj = cru.changepoint_detector(x, y)
+    y_fit, y_fit_diff, y_fit_diff2, slopes, breakpoints, depth, r, R2adj = cru.changepoint_detector(x, y)
     
     # EXTRACT: seasonal components
 
     trim_months = len(ex_monthly)%12
-    df = pd.DataFrame({'Tg':ex_monthly[:-1-trim_months]}, index=t_monthly[:-1-trim_months])     
-    
-    t = [ pd.to_datetime( str(df.index.year.unique()[i])+'-01-01') for i in range(len(df.index.year.unique())) ][1:] # years
+    df = pd.DataFrame({'Tg':ex_monthly[:-1-trim_months]}, index=t_monthly[:-1-trim_months])         
+    t_years = [ pd.to_datetime( str(df.index.year.unique()[i])+'-01-01') for i in range(len(df.index.year.unique())) ][1:] # years
     DJF = ( df[df.index.month==12]['Tg'].values + df[df.index.month==1]['Tg'].values[1:] + df[df.index.month==2]['Tg'].values[1:] ) / 3
     MAM = ( df[df.index.month==3]['Tg'].values[1:] + df[df.index.month==4]['Tg'].values[1:] + df[df.index.month==5]['Tg'].values[1:] ) / 3
     JJA = ( df[df.index.month==6]['Tg'].values[1:] + df[df.index.month==7]['Tg'].values[1:] + df[df.index.month==8]['Tg'].values[1:] ) / 3
     SON = ( df[df.index.month==9]['Tg'].values[1:] + df[df.index.month==10]['Tg'].values[1:] + df[df.index.month==11]['Tg'].values[1:] ) / 3
-
     ONDJFM = ( df[df.index.month==10]['Tg'].values[1:] + df[df.index.month==11]['Tg'].values[1:] + df[df.index.month==12]['Tg'].values + df[df.index.month==1]['Tg'].values[1:] + df[df.index.month==2]['Tg'].values[1:] + df[df.index.month==3]['Tg'].values[1:] ) / 6
-    AMJJAS = ( df[df.index.month==4]['Tg'].values[1:] + df[df.index.month==5]['Tg'].values[1:] + df[df.index.month==6]['Tg'].values[1:] + df[df.index.month==7]['Tg'].values[1:] + df[df.index.month==8]['Tg'].values[1:] + df[df.index.month==9]['Tg'].values[1:] ) / 6
-        
-    df_seasonal = pd.DataFrame({'DJF':DJF, 'MAM':MAM, 'JJA':JJA, 'SON':SON, 'ONDJFM':ONDJFM, 'AMJJAS':AMJJAS}, index = t)     
-    df_seasonal_ma = df_seasonal.rolling(10, center=True).mean() # decadal smoothing
-    mask = np.isfinite(df_seasonal_ma)
+    AMJJAS = ( df[df.index.month==4]['Tg'].values[1:] + df[df.index.month==5]['Tg'].values[1:] + df[df.index.month==6]['Tg'].values[1:] + df[df.index.month==7]['Tg'].values[1:] + df[df.index.month==8]['Tg'].values[1:] + df[df.index.month==9]['Tg'].values[1:] ) / 6        
+    df_seasonal = pd.DataFrame({'DJF':DJF, 'MAM':MAM, 'JJA':JJA, 'SON':SON, 'ONDJFM':ONDJFM, 'AMJJAS':AMJJAS}, index = t_years)     
+    mask = np.isfinite(df_seasonal)
+    df_seasonal_fft = pd.DataFrame(index=df_seasonal.index)
+    df_seasonal_fft['DJF'] = pd.DataFrame({'DJF':smooth_fft(df_seasonal['DJF'].values[mask['DJF']], nfft)}, index=df_seasonal['DJF'].index[mask['DJF']])
+    df_seasonal_fft['MAM'] = pd.DataFrame({'DJF':smooth_fft(df_seasonal['MAM'].values[mask['MAM']], nfft)}, index=df_seasonal['MAM'].index[mask['MAM']])
+    df_seasonal_fft['JJA'] = pd.DataFrame({'DJF':smooth_fft(df_seasonal['JJA'].values[mask['JJA']], nfft)}, index=df_seasonal['JJA'].index[mask['JJA']])
+    df_seasonal_fft['SON'] = pd.DataFrame({'DJF':smooth_fft(df_seasonal['SON'].values[mask['SON']], nfft)}, index=df_seasonal['SON'].index[mask['SON']])
+    df_seasonal_fft['ONDJFM'] = pd.DataFrame({'ONDJFM':smooth_fft(df_seasonal['ONDJFM'].values[mask['ONDJFM']], nfft)}, index=df_seasonal['ONDJFM'].index[mask['ONDJFM']])
+    df_seasonal_fft['AMJJAS'] = pd.DataFrame({'AMJJAS':smooth_fft(df_seasonal['AMJJAS'].values[mask['AMJJAS']], nfft)}, index=df_seasonal['AMJJAS'].index[mask['AMJJAS']])                
+#    mask = np.isfinite(df_seasonal_fft)
 
-    dates = df_seasonal_ma.index
-    df_seasonal_fft = pd.DataFrame(index=dates)
-    df_seasonal_fft['DJF'] = pd.DataFrame({'DJF':smooth_fft(df_seasonal_ma['DJF'].values[mask['DJF']], nfft)}, index=df_seasonal_ma['DJF'].index[mask['DJF']])
-    df_seasonal_fft['MAM'] = pd.DataFrame({'DJF':smooth_fft(df_seasonal_ma['MAM'].values[mask['MAM']], nfft)}, index=df_seasonal_ma['MAM'].index[mask['MAM']])
-    df_seasonal_fft['JJA'] = pd.DataFrame({'DJF':smooth_fft(df_seasonal_ma['JJA'].values[mask['JJA']], nfft)}, index=df_seasonal_ma['JJA'].index[mask['JJA']])
-    df_seasonal_fft['SON'] = pd.DataFrame({'DJF':smooth_fft(df_seasonal_ma['SON'].values[mask['SON']], nfft)}, index=df_seasonal_ma['SON'].index[mask['SON']])
-    df_seasonal_fft['ONDJFM'] = pd.DataFrame({'ONDJFM':smooth_fft(df_seasonal_ma['ONDJFM'].values[mask['ONDJFM']], nfft)}, index=df_seasonal_ma['ONDJFM'].index[mask['ONDJFM']])
-    df_seasonal_fft['AMJJAS'] = pd.DataFrame({'AMJJAS':smooth_fft(df_seasonal_ma['AMJJAS'].values[mask['AMJJAS']], nfft)}, index=df_seasonal_ma['AMJJAS'].index[mask['AMJJAS']])
-                
-    mask = np.isfinite(df_seasonal_fft)
     data = []
     trace_winter=[
             go.Scatter(                                  
-                x=df_seasonal_fft.index[mask['ONDJFM']], y=df_seasonal_fft['ONDJFM'][mask['ONDJFM']], 
+                x=df_seasonal_fft.index, y=df_seasonal_fft['ONDJFM'], 
                 mode='lines+markers', 
                 line=dict(width=1, color='rgba(20,115,175,0.5)'),
                 marker=dict(size=7, symbol='square', opacity=0.5, color='rgba(20,115,175,0.5)', line_width=1, line_color='rgba(20,115,175,0.5)'),                       
@@ -1058,7 +1070,7 @@ def update_plot_seasonal(value):
     ]
     trace_summer=[
             go.Scatter(                                  
-                x=df_seasonal_fft.index[mask['AMJJAS']], y=df_seasonal_fft['AMJJAS'][mask['AMJJAS']], 
+                x=df_seasonal_fft.index, y=df_seasonal_fft['AMJJAS'], 
                 mode='lines+markers', 
                 line=dict(width=1, color='rgba(234, 89, 78, 0.5)'),
                 marker=dict(size=7, symbol='square', opacity=0.5, color='rgba(234, 89, 78, 0.5)', line_width=1, line_color='rgba(234, 89, 78, 0.5)'),       
@@ -1104,7 +1116,7 @@ def update_plot_seasonal(value):
     fig.update_layout(
         template = "plotly_dark",
 #       template = None,
-        xaxis = dict(range=[dates[0],dates[-1]]),       
+        xaxis = dict(range=[df_seasonal.index[0],df_seasonal.index[-1]]),       
         xaxis_title = {'text': 'Year'},
         yaxis_title = {'text': 'Anomaly (from 1961-1990), °C'},
         title = {'text': 'SEASONAL DECADAL EXPECTATIONS (E)', 'x':0.1, 'y':0.95},
@@ -1114,7 +1126,7 @@ def update_plot_seasonal(value):
         fig.update_layout(
             annotations=[
                 dict(
-                    x=dates[np.floor(len(dates)/2).astype(int)],
+                    x=dates[np.floor(len(df_seasonal)/2).astype(int)],
                     y=0,
                     xref="x",
                     yref="y",
@@ -1129,6 +1141,18 @@ def update_plot_seasonal(value):
             ]
         )    
 
+    for k in range(len(breakpoints)):
+
+        fig.add_shape(type='line',
+            yref="y",
+            xref="x",
+            x0=t[breakpoints[k]],
+            y0=np.nanmin([np.nanmin(df_seasonal_fft['ONDJFM'].values), np.nanmin(df_seasonal_fft['AMJJAS'].values)]),
+            x1=t[breakpoints[k]],
+            y1=np.nanmax([np.nanmax(df_seasonal_fft['ONDJFM'].values), np.nanmax(df_seasonal_fft['AMJJAS'].values)]),
+            line=dict(color='rgba(229, 176, 57, 1)', width=1, dash='dot'),
+       )
+       
     fig.update_layout(
         legend=dict(
             orientation='h',
